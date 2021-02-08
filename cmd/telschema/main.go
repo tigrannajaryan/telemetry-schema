@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Program custcol is an extension to the OpenTelemetry Collector
+// Program telschema is an extension to the OpenTelemetry Collector
 // that includes additional components, some vendor-specific, contributed
 // from the wider community.
 package main
@@ -24,7 +24,7 @@ import (
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/service"
 
-	"github.com/tigrannajaryan/custcol/internal/version"
+	"github.com/tigrannajaryan/telemetry-schema/internal/version"
 )
 
 func main() {
@@ -34,8 +34,8 @@ func main() {
 	}
 
 	info := component.ApplicationStartInfo{
-		ExeName:  "custcol",
-		LongName: "Custom Collector",
+		ExeName:  "telschema",
+		LongName: "Telemetry Schema Converter",
 		Version:  version.Version,
 		GitHash:  version.GitHash,
 	}

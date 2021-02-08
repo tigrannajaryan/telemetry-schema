@@ -4,7 +4,7 @@ RUN_CONFIG=local/config.yaml
 
 CMD?=
 GIT_SHA=$(shell git rev-parse --short HEAD)
-BUILD_INFO_IMPORT_PATH=github.com/tigrannajaryan/custcol/internal/version
+BUILD_INFO_IMPORT_PATH=github.com/tigrannajaryan/telemetry-schema/internal/version
 BUILD_X1=-X $(BUILD_INFO_IMPORT_PATH).GitHash=$(GIT_SHA)
 ifdef VERSION
 BUILD_X2=-X $(BUILD_INFO_IMPORT_PATH).Version=$(VERSION)
@@ -14,7 +14,7 @@ BUILD_INFO=-ldflags "${BUILD_X1} ${BUILD_X2} ${BUILD_X3}"
 STATIC_CHECK=staticcheck
 OTEL_VERSION=master
 
-EXE_NAME=custcol
+EXE_NAME=telschema
 
 # Modules to run integration tests on.
 # XXX: Find a way to automatically populate this. Too slow to run across all modules when there are just a few.
@@ -29,7 +29,7 @@ all: common build-exe
 .PHONY: test-with-cover
 unit-tests-with-cover:
 	@echo Verifying that all packages have test files to count in coverage
-	@internal/buildscripts/check-test-files.sh $(subst github.com/tigrannajaryan/custcol/,./,$(ALL_PKGS))
+	@internal/buildscripts/check-test-files.sh $(subst github.com/tigrannajaryan/telemetry-schema/,./,$(ALL_PKGS))
 	@$(MAKE) for-all CMD="make do-unit-tests-with-cover"
 
 .PHONY: integration-tests-with-cover

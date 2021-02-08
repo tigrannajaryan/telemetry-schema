@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/exp-invsvc.iml" filepath="$PROJECT_DIR$/.idea/exp-invsvc.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/telemetry-schema.iml" filepath="$PROJECT_DIR$/.idea/telemetry-schema.iml" />
     </modules>
   </component>
 </project>

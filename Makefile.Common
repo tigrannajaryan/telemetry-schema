@@ -106,7 +106,7 @@ lint-static-check:
 .PHONY: fmt
 fmt:
 	gofmt  -w -s ./
-	goimports -w  -local github.com/tigrannajaryan/custcol ./
+	goimports -w  -local github.com/tigrannajaryan/telemetry-schema ./
 
 .PHONY: lint
 lint: lint-static-check
@@ -122,7 +122,7 @@ misspell-correction:
 
 .PHONY: impi
 impi:
-	@$(IMPI) --local github.com/tigrannajaryan/custcol --scheme stdThirdPartyLocal ./...
+	@$(IMPI) --local github.com/tigrannajaryan/telemetry-schema --scheme stdThirdPartyLocal ./...
 
 .PHONY: dep 
 dep:

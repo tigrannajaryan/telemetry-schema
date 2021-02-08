@@ -1,0 +1,144 @@
+# Section "all" applies to attributes names everywhere: resources, spans, logs, metric labels.
+# The only translation possible in section "all" is renaming of attributes in
+# versions. For human readability versions are listed in reverse chronological
+# order, however note that the translations are applied in the order defined by
+# semver ordering.
+all:
+  1.1.0:
+    # Mapping of attribute names (label names for metrics). The key is the old name
+    # used prior to this version, the value is the new name starting from this version.
+
+    # Rename k8s.* to kubernetes.*
+    k8s.cluster.name: kubernetes.cluster.name
+    k8s.namespace.name: kubernetes.namespace.name
+    k8s.node.name: kubernetes.node.name
+    k8s.node.uid: kubernetes.node.uid
+    k8s.pod.name: kubernetes.pod.name
+    k8s.pod.uid: kubernetes.pod.uid
+    k8s.container.name: kubernetes.container.name
+    k8s.replicaset.name: kubernetes.replicaset.name
+    k8s.replicaset.uid: kubernetes.replicaset.uid
+    k8s.cronjob.name: kubernetes.cronjob.name
+    k8s.cronjob.uid: kubernetes.cronjob.uid
+    k8s.job.name: kubernetes.job.name
+    k8s.job.uid: kubernetes.job.uid
+    k8s.statefulset.name: kubernetes.statefulset.name
+    k8s.statefulset.uid: kubernetes.statefulset.uid
+    k8s.daemonset.name: kubernetes.daemonset.name
+    k8s.daemonset.uid: kubernetes.daemonset.uid
+    k8s.deployment.name: kubernetes.deployment.name
+    k8s.deployment.uid: kubernetes.deployment.uid
+
+    service.namespace: service.namespace.name
+
+  1.0.0: # No changes in this version. May be omitted.
+
+  0.0.0: # Initial version, cannot specify any translations. May be omitted.
+
+# Like "all" the "resources" section may contain only attribute renaming translations.
+# The only translation possible in this section is renaming of attributes in
+# versions.
+resources:
+  1.1.0:
+    # Mapping of attribute names. The key is the old name
+    # used prior to this version, the value is the new name starting from this version.
+    telemetry.auto.version: telemetry.auto_instr.version
+
+  1.0.0: # No changes for this version.
+
+traces:
+  1.1.0:
+    peer.service: peer.service.name
+
+metrics:
+  1.1.0:
+    # "all_metrics" section defines translations for all metrics, regardless of metric name.
+    # The only translation possible in this section is renaming of metric labels.
+    all_metrics:
+      # Mapping of label names. The key is the old name used prior to this version,
+      # the value is the new name starting from this version.
+      http.status_code: http.response_status_code
+
+    # "by_name" section defines translation for specific metrics only, specified by the
+    #  name of the metric.
+    by_name:
+      rename_labels:
+        # Name of the metric to apply this rule to.
+        system.cpu.utilization:
+          # Mapping of label names. The key is the old name used prior to this version,
+          # the value is the new name starting from this version.
+          # "status" label is renamed to "state" for metric "system.cpu.utilization".
+          status: state
+
+        system.memory.usage:
+          status: state
+
+        system.memory.utilization:
+          status: state
+
+        system.paging.usage:
+          status: state
+
+      rename_metric:
+        # Rename metrics. Keys are old metric names, values are new metric names.
+        container.cpu.usage.total: cpu.usage.total
+        container.memory.usage.max: memory.usage.max
+
+      add_labels:
+        # Add labels to a metric. Keys are metric names.
+        # Note: this may need a different way to config to allow adding the same
+        # label to many metrics.
+        container.cpu.usage.total:
+          # Labels to add as key/value paris.
+          plugin: docker
+        container.memory.usage.max:
+          plugin: docker
+
+      duplicate_labels:
+        # Duplicate labels of a metric. Keys are metric names.
+        # Note: this may need a different way to config to allow duplicating the same
+        # label for many metrics.
+        container.cpu.usage.total:
+          # Maps of labels to copy. Keys are existing label names, values are new label
+          # names. The value of the new label is set equal to the value of existing label.
+          container.name: plugin_instance
+        container.memory.usage.max:
+          container.name: plugin_instance
+
+
+      split:
+        # Rules to split a metric into several metrics using a label for split.
+        #
+        # Name of old metric to split.
+        system.memory.usage:
+          # Name of label in the old metric to use for splitting. The label will be
+          # eliminated, the new metric will not have it.
+          # Note: this can be enhanced in the future to allow an array of labels
+          # so that splitting can happen across more then one dimension.
+          by_label: state
+          # Names of new metrics to create, one for each possible value of label.
+          labels_to_metrics:
+            # If "state" label equals "used" create a new metric called "system.memory.used".
+            used: system.memory.used
+            free: system.memory.free
+            cached: system.memory.cached
+
+      merge:
+        # List of rules to merge several metrics into a new metrics and add a label.
+        #
+        # Name of new metric to create.
+        system.disk.io:
+          # Name of label to add to the new metric.
+          by_label: direction
+          # Mapping of old metrics to new label values, one for each possible value of the
+          #  new label.
+          labels_for_metrics:
+            # For old metric "system.disk.io.read" set "direction" label equal to "read".
+            read: system.disk.io.read
+            write: system.disk.io.write
+
+      to_delta:
+        # List of metric names to convert cumulative values to delta values.
+        - system.cpu.time
+
+logs:

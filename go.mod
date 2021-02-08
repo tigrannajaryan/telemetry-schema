@@ -1,4 +1,4 @@
-module github.com/tigrannajaryan/custcol
+module github.com/tigrannajaryan/telemetry-schema
 
 go 1.15
 
