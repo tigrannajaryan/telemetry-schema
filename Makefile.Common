@@ -2,128 +2,66 @@
 SRC_ROOT := $(realpath $(dir $(lastword $(MAKEFILE_LIST))))
 
 ALL_SRC := $(shell find . -name '*.go' \
+                                -not -path '*/third_party/*' \
                                 -type f | sort)
+
+# ALL_PKGS is the list of all packages where ALL_SRC files reside.
+ALL_PKGS := $(shell go list ./...)
 
 # All source code and documents. Used in spell check.
-ALL_SRC_AND_DOC := $(shell find . \( -name "*.md" -o -name "*.go" -o -name "*.yaml" \) \
+ALL_DOC := $(shell find . \( -name "*.md" -o -name "*.yaml" \) \
                                 -type f | sort)
 
-# ALL_PKGS is used with 'go cover'
-ALL_PKGS := $(shell go list $(sort $(dir $(ALL_SRC))) 2>/dev/null)
-# ALL_MODULES includes ./* dirs (excludes . dir)
-ALL_MODULES := $(shell find . -type f -name "go.mod" -exec dirname {} \; | sort | egrep  '^./' )
-
-GOTEST_OPT?= -race -timeout 30s
-GOTEST_OPT_WITH_COVERAGE = $(GOTEST_OPT) -coverprofile=coverage.txt -covermode=atomic
-GOTEST_OPT_WITH_INTEGRATION=$(GOTEST_OPT) -v -tags=integration -run=Integration -coverprofile=integration-coverage.txt -covermode=atomic
+GOTEST_OPT?= -v -race -timeout 180s
+GO_ACC=go-acc
 GOTEST=go test
-GOOS=$(shell go env GOOS)
-GOARCH=$(shell go env GOARCH)
-ADDLICENCESE= addlicense
 MISSPELL=misspell -error
 MISSPELL_CORRECTION=misspell -w
-STATICCHECK=staticcheck
+STATIC_CHECK=staticcheck
 LINT=golangci-lint
 IMPI=impi
-# BUILD_TYPE should be one of (dev, release).
-BUILD_TYPE?=release
-
-all-modules:
-	@echo $(ALL_MODULES) | tr ' ' '\n' | sort
-
-all-pkgs:
-	@echo $(ALL_PKGS) | tr ' ' '\n' | sort
-
-all-srcs:
-	@echo $(ALL_SRC) | tr ' ' '\n' | sort
-
-.DEFAULT_GOAL := common
-
-.PHONY: common
-common: impi test
 
 .PHONY: test
 test:
-	@set -e; for dir in $(ALL_MODULES); do \
-	  echo "go test ./... in $${dir}"; \
-	  (cd "$${dir}" && \
-	    $(GOTEST) ./... ); \
-	done
-
-.PHONY: do-unit-tests-with-cover
-do-unit-tests-with-cover:
-	@echo "running go unit test ./... + coverage in `pwd`"
-	@$(GOTEST) $(GOTEST_OPT_WITH_COVERAGE) ./...
-	go tool cover -html=coverage.txt -o coverage.html
-
-.PHONY: run-integration-tests-with-cover
-do-integration-tests-with-cover:
-	@echo "running go integration test ./... + coverage in `pwd`"
-	@$(GOTEST) $(GOTEST_OPT_WITH_INTEGRATION) ./...
-	@if [ -e integration-coverage.txt ]; then \
-  		go tool cover -html=integration-coverage.txt -o integration-coverage.html; \
-  	fi
+	@echo "running go unit test ./... in `pwd`"
+	@echo $(ALL_PKGS) | xargs -n 10 $(GOTEST) $(GOTEST_OPT)
 
 .PHONY: benchmark
 benchmark:
-	$(GOTEST) -bench=. -run=notests $(ALL_PKGS)
+	$(GOTEST) -bench=. -run=notests ./...
 
-.PHONY: addlicense
-addlicense:
-	@ADDLICENCESEOUT=`$(ADDLICENCESE) -y -c 'OpenTelemetry Authors' $(ALL_SRC) 2>&1`; \
-		if [ "$$ADDLICENCESEOUT" ]; then \
-			echo "$(ADDLICENCESE) FAILED => add License errors:\n"; \
-			echo "$$ADDLICENCESEOUT\n"; \
-			exit 1; \
-		else \
-			echo "Add License finished successfully"; \
-		fi
-
-.PHONY: checklicense
-checklicense:
-	@ADDLICENCESEOUT=`$(ADDLICENCESE) -check $(ALL_SRC) 2>&1`; \
-		if [ "$$ADDLICENCESEOUT" ]; then \
-			echo "$(ADDLICENCESE) FAILED => add License errors:\n"; \
-			echo "$$ADDLICENCESEOUT\n"; \
-			echo "Use 'make addlicense' to fix this."; \
-			exit 1; \
-		else \
-			echo "Check License finished successfully"; \
-		fi
+.PHONY: fmt
+fmt:
+	gofmt -w -s ./
+	goimports -w  -local github.com/tigrannajaryan/telemetry-schema ./
 
 .PHONY: lint-static-check
 lint-static-check:
-	@STATIC_CHECK_OUT=`$(STATICCHECK) ./... 2>&1`; \
+	@STATIC_CHECK_OUT=`$(STATIC_CHECK) $(ALL_PKGS) 2>&1`; \
 		if [ "$$STATIC_CHECK_OUT" ]; then \
-			echo "$(STATICCHECK) FAILED => static check errors:\n"; \
+			echo "$(STATIC_CHECK) FAILED => static check errors:\n"; \
 			echo "$$STATIC_CHECK_OUT\n"; \
 			exit 1; \
 		else \
 			echo "Static check finished successfully"; \
 		fi
 
-
-.PHONY: fmt
-fmt:
-	gofmt  -w -s ./
-	goimports -w  -local github.com/tigrannajaryan/custcol ./
-
 .PHONY: lint
-lint: lint-static-check
+lint:
 	$(LINT) run --allow-parallel-runners
 
 .PHONY: misspell
 misspell:
-	$(MISSPELL) $(ALL_SRC_AND_DOC)
+ifdef ALL_DOC
+	$(MISSPELL) $(ALL_DOC)
+endif
 
 .PHONY: misspell-correction
 misspell-correction:
-	$(MISSPELL_CORRECTION) $(ALL_SRC_AND_DOC)
+ifdef ALL_DOC
+	$(MISSPELL_CORRECTION) $(ALL_DOC)
+endif
 
 .PHONY: impi
 impi:
-	@$(IMPI) --local github.com/tigrannajaryan/custcol --scheme stdThirdPartyLocal ./...
-
-.PHONY: dep 
-dep:
-	go mod download
+	@$(IMPI) --local github.com/tigrannajaryan/telemetry-schema --scheme stdThirdPartyLocal ./...
