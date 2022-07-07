@@ -47,9 +47,18 @@ func TestResourceSchemaConversion(t *testing.T) {
 
 	resource := &otlpresource.Resource{}
 	resource.Attributes = []*otlpcommon.KeyValue{
-		{Key: "unknown-attribute", Value: &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_IntValue{123}}},
-		{Key: "k8s.cluster.name", Value: &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_StringValue{"OnlineShop"}}},
-		{Key: "telemetry.auto.version", Value: &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_StringValue{"1.2.3"}}},
+		{
+			Key:   "unknown-attribute",
+			Value: &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_IntValue{123}},
+		},
+		{
+			Key:   "k8s.cluster.name",
+			Value: &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_StringValue{"OnlineShop"}},
+		},
+		{
+			Key:   "telemetry.auto.version",
+			Value: &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_StringValue{"1.2.3"}},
+		},
 	}
 	resource2 := proto.Clone(resource).(*otlpresource.Resource)
 	err := compiled.ConvertResourceToLatest("0.0.0", resource2)
@@ -66,14 +75,18 @@ func TestResourceSchemaConversion(t *testing.T) {
 
 	attrVal, exists = getAttr(resource2.Attributes, "kubernetes.cluster.name")
 	assert.True(t, exists)
-	assert.EqualValues(t, &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_StringValue{"OnlineShop"}}, attrVal)
+	assert.EqualValues(
+		t, &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_StringValue{"OnlineShop"}}, attrVal,
+	)
 
 	_, exists = getAttr(resource2.Attributes, "telemetry.auto.version")
 	assert.False(t, exists)
 
 	attrVal, exists = getAttr(resource2.Attributes, "telemetry.auto_instr.version")
 	assert.True(t, exists)
-	assert.EqualValues(t, &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_StringValue{"1.2.3"}}, attrVal)
+	assert.EqualValues(
+		t, &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_StringValue{"1.2.3"}}, attrVal,
+	)
 }
 
 func getLabel(attrs []*otlpcommon.StringKeyValue, key string) (string, bool) {
@@ -125,7 +138,30 @@ func TestMetricsSchemaConversion(t *testing.T) {
 	metric2.Int64DataPoints = []*otlpmetric.Int64DataPoint{dp2}
 	metrics = append(metrics, metric2)
 
-	err := compiled.ConvertMetricsToLatest("0.0.0", metrics)
+	metric3 := &otlpmetric.Metric{
+		MetricDescriptor: &otlpmetric.MetricDescriptor{
+			Name: "system.paging.operations",
+			Type: otlpmetric.MetricDescriptor_INT64,
+		},
+	}
+
+	dp3 := &otlpmetric.Int64DataPoint{
+		Labels: []*otlpcommon.StringKeyValue{
+			{Key: "direction", Value: "in"},
+			{Key: "http.status_code", Value: "abc"},
+		},
+	}
+	dp4 := &otlpmetric.Int64DataPoint{
+		Labels: []*otlpcommon.StringKeyValue{
+			{Key: "direction", Value: "out"},
+			{Key: "http.status_code", Value: "abc"},
+		},
+	}
+
+	metric3.Int64DataPoints = []*otlpmetric.Int64DataPoint{dp3, dp4}
+	metrics = append(metrics, metric3)
+
+	err := compiled.ConvertMetricsToLatest("0.0.0", &metrics)
 	assert.NoError(t, err)
 
 	assert.EqualValues(t, "cpu.usage.total", metric1.MetricDescriptor.Name)
@@ -143,6 +179,16 @@ func TestMetricsSchemaConversion(t *testing.T) {
 	assert.EqualValues(t, "abc", v)
 	v, _ = getLabel(dp2.Labels, "status")
 	assert.EqualValues(t, "234", v)
+
+	assert.EqualValues(t, "system.paging.operations.in", metrics[2].MetricDescriptor.Name)
+	assert.Len(t, metrics[2].Int64DataPoints[0].Labels, 1)
+	v, _ = getLabel(metrics[2].Int64DataPoints[0].Labels, "http.response_status_code")
+	assert.EqualValues(t, "abc", v)
+
+	assert.EqualValues(t, "system.paging.operations.out", metrics[3].MetricDescriptor.Name)
+	assert.Len(t, metrics[3].Int64DataPoints[0].Labels, 1)
+	v, _ = getLabel(metrics[3].Int64DataPoints[0].Labels, "http.response_status_code")
+	assert.EqualValues(t, "abc", v)
 }
 
 func BenchmarkResourceSchemaConversion(b *testing.B) {
@@ -152,14 +198,28 @@ func BenchmarkResourceSchemaConversion(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		resource := &otlpresource.Resource{}
 		resource.Attributes = []*otlpcommon.KeyValue{
-			{Key: "k8s.container.name", Value: &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_IntValue{123}}},
-			{Key: "k8s.cluster.name", Value: &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_StringValue{"OnlineShop"}}},
-			{Key: "telemetry.auto.version", Value: &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_StringValue{"1.2.3"}}},
+			{
+				Key:   "k8s.container.name",
+				Value: &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_IntValue{123}},
+			},
+			{
+				Key:   "k8s.cluster.name",
+				Value: &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_StringValue{"OnlineShop"}},
+			},
+			{
+				Key:   "telemetry.auto.version",
+				Value: &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_StringValue{"1.2.3"}},
+			},
 		}
 
 		for j := len(resource.Attributes); j < 20; j++ {
-			resource.Attributes = append(resource.Attributes,
-				&otlpcommon.KeyValue{Key: "attribute" + strconv.Itoa(j), Value: &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_IntValue{int64(j)}}})
+			resource.Attributes = append(
+				resource.Attributes,
+				&otlpcommon.KeyValue{
+					Key:   "attribute" + strconv.Itoa(j),
+					Value: &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_IntValue{int64(j)}},
+				},
+			)
 		}
 
 		resources = append(resources, resource)

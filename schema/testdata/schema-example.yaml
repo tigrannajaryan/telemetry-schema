@@ -92,7 +92,7 @@ versions:
         # to this version. The order in this sequence is important. Translations are
         # applied from top to bottom in the listed order.
 
-        - rename_labels:
+        - rename_attributes:
             # Rename labels of all metrics, regardless of metric name.
             # The keys are the old label name used prior to this version, the values are
             # the new label name starting from this version.
@@ -104,7 +104,7 @@ versions:
             container.cpu.usage.total: cpu.usage.total
             container.memory.usage.max: memory.usage.max
 
-        - rename_labels:
+        - rename_attributes:
             apply_to_metrics:
               # Name of the metric to apply this rule to. If empty the rule applies to all metrics.
               - system.cpu.utilization
@@ -116,7 +116,7 @@ versions:
               # the new label name starting from this version.
               status: state
 
-        - add_labels:
+        - add_attributes:
             # Add labels to a metric.
             apply_to_metrics:
               - cpu.usage.total
@@ -124,7 +124,7 @@ versions:
             label_map:
               status: state
 
-        - duplicate_labels:
+        - duplicate_attributes:
             # Duplicate labels of a metric.
             apply_to_metrics:
               - cpu.usage.total
@@ -133,6 +133,22 @@ versions:
               # Maps of labels to copy. Keys are existing label names, values are new label
               # names. The value of the new label is set equal to the value of existing label.
               container.name: plugin_instance
+
+        - split:
+            # Rules to split a metric into several metrics using an attribute for split.
+            # Example from the change done by https://github.com/open-telemetry/opentelemetry-specification/pull/2617
+            # Name of old metric to split.
+            apply_to_metric: system.paging.operations
+            # Name of attribute in the old metric to use for splitting. The attribute will be
+            # eliminated, the new metric will not have it.
+            # Note: this can be enhanced in the future to allow an array of attributes
+            # so that splitting can happen across more than one dimension.
+            by_attribute: direction
+            # Names of new metrics to create, one for each possible value of attribute.
+            metrics_from_attributes:
+              # If "direction" attribute equals "in" create a new metric called "system.paging.operations.in".
+              system.paging.operations.in: in
+              system.paging.operations.out: out
 
         - split:
             # Rules to split a metric into several metrics using a label for split.

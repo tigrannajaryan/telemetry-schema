@@ -21,9 +21,15 @@ func Compile(schema *ast.Schema) *compiled.Schema {
 			compiledActionsForVersion[versionNum] = actionsForVer
 		}
 
-		actionsForVer.Resource = compileResourceActions(versionDescr.All.Changes, versionDescr.Resources.Changes)
-		actionsForVer.Metrics = compileMetricActions(versionDescr.All.Changes, versionDescr.Metrics.Changes)
-		actionsForVer.Spans = compileSpanActions(versionDescr.All.Changes, versionDescr.Spans.Changes)
+		actionsForVer.Resource = compileResourceActions(
+			versionDescr.All.Changes, versionDescr.Resources.Changes,
+		)
+		actionsForVer.Metrics = compileMetricActions(
+			versionDescr.All.Changes, versionDescr.Metrics.Changes,
+		)
+		actionsForVer.Spans = compileSpanActions(
+			versionDescr.All.Changes, versionDescr.Spans.Changes,
+		)
 	}
 
 	// Convert map by version to a slice.
@@ -69,64 +75,51 @@ func compileMetricActions(
 	metricActions []ast.MetricTranslationAction,
 ) (result compiled.MetricActions) {
 
-	var compiledActionSeq []compiled.MetricAction
-
 	// First add actions in "all" section.
 	for _, action := range allActions {
 		if action.RenameAttributes != nil {
 			compiledAction := compiled.MetricLabelRenameAction{
 				LabelMap: *action.RenameAttributes,
 			}
-			compiledActionSeq = append(compiledActionSeq, compiledAction)
 			// Should apply to all metrics.
-			result.OtherMetrics = append(result.OtherMetrics, compiledAction)
+			result.Actions = append(result.Actions, compiledAction)
 		}
 	}
 
 	// Now compile metric actions and add one by one.
-	affectedMetrics := map[types.MetricName]bool{}
 	for _, srcAction := range metricActions {
 		var compiledAction compiled.MetricAction
 
 		if srcAction.RenameMetrics != nil {
 			compiledAction = compiled.MetricRenameAction(srcAction.RenameMetrics)
-			for metricName := range srcAction.RenameMetrics {
-				affectedMetrics[metricName] = true
-			}
+			result.Actions = append(result.Actions, compiledAction)
 		} else if srcAction.RenameLabels != nil {
 			compiledAction = compiled.MetricLabelRenameAction{
 				ApplyOnlyToMetrics: metricNamesToMap(srcAction.RenameLabels.ApplyToMetrics),
-				LabelMap:           srcAction.RenameLabels.LabelMap,
+				LabelMap:           srcAction.RenameLabels.AttributeMap,
 			}
 
-			if len(srcAction.RenameLabels.ApplyToMetrics) == 0 {
-				// Should apply to all metrics.
-				result.OtherMetrics = append(result.OtherMetrics, compiledAction)
-			} else {
-				// Applies to specific metrics only.
-				for _, metricName := range srcAction.RenameLabels.ApplyToMetrics {
-					affectedMetrics[metricName] = true
-				}
+			result.Actions = append(result.Actions, compiledAction)
+		} else if srcAction.Split != nil {
+			compiledAction = compiled.MetricSplitAction{
+				MetricName:    srcAction.Split.ApplyToMetric,
+				AttributeName: srcAction.Split.ByAttribute,
+				SplitMap:      compileSplitMap(srcAction.Split.AttributesToMetrics),
 			}
+
+			result.Actions = append(result.Actions, compiledAction)
 		}
-
-		if compiledAction != nil {
-			compiledActionSeq = append(compiledActionSeq, compiledAction)
-		}
-	}
-
-	result.ByName = map[types.MetricName][]compiled.MetricAction{}
-
-	for metricName := range affectedMetrics {
-		result.ByName[metricName] = compiledActionSeq
-		// TODO: optimize compiledActionSeq by checking if metricName is in the
-		// ApplyOnlyToMetrics map that limits the application of particular action
-		// then ApplyOnlyToMetrics can be deleted since it has no effect. That will
-		// speed up the action execution since we no longer need to lookup the metric
-		// name in the limit map.
 	}
 
 	return result
+}
+
+func compileSplitMap(m map[types.MetricName]types.AttributeValue) map[types.AttributeValue]types.MetricName {
+	r := map[types.AttributeValue]types.MetricName{}
+	for k, v := range m {
+		r[v] = k
+	}
+	return r
 }
 
 func metricNamesToMap(metrics []types.MetricName) map[types.MetricName]bool {

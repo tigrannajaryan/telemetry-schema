@@ -6,7 +6,6 @@ import (
 	otlpmetric "github.com/open-telemetry/opentelemetry-proto/gen/go/metrics/v1"
 	otlpresource "github.com/open-telemetry/opentelemetry-proto/gen/go/resource/v1"
 	otlptrace "github.com/open-telemetry/opentelemetry-proto/gen/go/trace/v1"
-
 	"github.com/tigrannajaryan/telemetry-schema/schema/types"
 )
 
@@ -39,24 +38,18 @@ func (acts ResourceActions) Apply(resource *otlpresource.Resource) error {
 }
 
 type MetricActions struct {
-	ByName       map[types.MetricName][]MetricAction
-	OtherMetrics []MetricAction
+	Actions []MetricAction
 }
 
-func (acts MetricActions) Apply(metric *otlpmetric.Metric) error {
-	metricName := metric.MetricDescriptor.Name
-	actions, exists := acts.ByName[types.MetricName(metricName)]
-	if !exists {
-		actions = acts.OtherMetrics
-	}
-
-	for _, a := range actions {
-		err := a.Apply(metric)
+func (acts MetricActions) Apply(metrics []*otlpmetric.Metric) ([]*otlpmetric.Metric, error) {
+	for _, a := range acts.Actions {
+		var err error
+		metrics, err = a.Apply(metrics)
 		if err != nil {
-			return err
+			return metrics, err
 		}
 	}
-	return nil
+	return metrics, nil
 }
 
 type ResourceAction interface {
@@ -82,7 +75,7 @@ func (acts SpanActions) Apply(span *otlptrace.Span) error {
 }
 
 type MetricAction interface {
-	Apply(metric *otlpmetric.Metric) error
+	Apply(metrics []*otlpmetric.Metric) ([]*otlpmetric.Metric, error)
 }
 
 //type LogRecordAction interface {
@@ -101,11 +94,15 @@ func (afv ActionsForVersions) Swap(i, j int) {
 	afv[i], afv[j] = afv[j], afv[i]
 }
 
-func (s *Schema) ConvertResourceToLatest(fromVersion types.TelemetryVersion, resource *otlpresource.Resource) error {
-	startIndex := sort.Search(len(s.Versions), func(i int) bool {
-		// TODO: use proper semver comparison.
-		return s.Versions[i].VersionNum > fromVersion
-	})
+func (s *Schema) ConvertResourceToLatest(
+	fromVersion types.TelemetryVersion, resource *otlpresource.Resource,
+) error {
+	startIndex := sort.Search(
+		len(s.Versions), func(i int) bool {
+			// TODO: use proper semver comparison.
+			return s.Versions[i].VersionNum > fromVersion
+		},
+	)
 	if startIndex > len(s.Versions) {
 		// Nothing to do
 		return nil
@@ -120,11 +117,15 @@ func (s *Schema) ConvertResourceToLatest(fromVersion types.TelemetryVersion, res
 	return nil
 }
 
-func (s *Schema) ConvertSpansToLatest(fromVersion types.TelemetryVersion, spans []*otlptrace.Span) error {
-	startIndex := sort.Search(len(s.Versions), func(i int) bool {
-		// TODO: use proper semver comparison.
-		return s.Versions[i].VersionNum > fromVersion
-	})
+func (s *Schema) ConvertSpansToLatest(
+	fromVersion types.TelemetryVersion, spans []*otlptrace.Span,
+) error {
+	startIndex := sort.Search(
+		len(s.Versions), func(i int) bool {
+			// TODO: use proper semver comparison.
+			return s.Versions[i].VersionNum > fromVersion
+		},
+	)
 	if startIndex > len(s.Versions) {
 		// Nothing to do
 		return nil
@@ -142,22 +143,25 @@ func (s *Schema) ConvertSpansToLatest(fromVersion types.TelemetryVersion, spans 
 	return nil
 }
 
-func (s *Schema) ConvertMetricsToLatest(fromVersion types.TelemetryVersion, metrics []*otlpmetric.Metric) error {
-	startIndex := sort.Search(len(s.Versions), func(i int) bool {
-		// TODO: use proper semver comparison.
-		return s.Versions[i].VersionNum > fromVersion
-	})
+func (s *Schema) ConvertMetricsToLatest(
+	fromVersion types.TelemetryVersion, metrics *[]*otlpmetric.Metric,
+) error {
+	startIndex := sort.Search(
+		len(s.Versions), func(i int) bool {
+			// TODO: use proper semver comparison.
+			return s.Versions[i].VersionNum > fromVersion
+		},
+	)
 	if startIndex > len(s.Versions) {
 		// Nothing to do
 		return nil
 	}
 
 	for i := startIndex; i < len(s.Versions); i++ {
-		for j := 0; j < len(metrics); j++ {
-			metric := metrics[j]
-			if err := s.Versions[i].Metrics.Apply(metric); err != nil {
-				return err
-			}
+		var err error
+		*metrics, err = s.Versions[i].Metrics.Apply(*metrics)
+		if err != nil {
+			return err
 		}
 	}
 

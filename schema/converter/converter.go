@@ -26,11 +26,13 @@ func convertTraceRequest(request *otlptracecol.ExportTraceServiceRequest, schema
 	}
 }
 
-func convertMetricRequest(request *otlpmetriccol.ExportMetricsServiceRequest, schema *compiled.Schema) {
+func convertMetricRequest(
+	request *otlpmetriccol.ExportMetricsServiceRequest, schema *compiled.Schema,
+) {
 	for _, rss := range request.ResourceMetrics {
 		convertResource(rss.Resource, schema)
 		for _, ils := range rss.InstrumentationLibraryMetrics {
-			if err := schema.ConvertMetricsToLatest("0.0.0", ils.Metrics); err != nil {
+			if err := schema.ConvertMetricsToLatest("0.0.0", &ils.Metrics); err != nil {
 				// logger.Debug("Conversion error", zap.Error(err))
 			}
 		}

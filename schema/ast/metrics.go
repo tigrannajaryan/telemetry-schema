@@ -8,30 +8,30 @@ type VersionOfMetrics struct {
 }
 
 type MetricTranslationAction struct {
-	RenameMetrics   map[types.MetricName]types.MetricName `yaml:"rename_metrics"`
-	RenameLabels    *LabelMapForMetrics                   `yaml:"rename_labels"`
-	AddLabels       *LabelMapForMetrics                   `yaml:"add_labels"`
-	DuplicateLabels *LabelMapForMetrics                   `yaml:"duplicate_labels"`
-	Split           *SplitMetric                          `yaml:"split"`
-	Merge           *MergeMetric                          `yaml:"merge"`
-	ToDelta         []types.MetricName                    `yaml:"to_delta"`
+	RenameMetrics       map[types.MetricName]types.MetricName `yaml:"rename_metrics"`
+	RenameLabels        *AttributeMapForMetrics               `yaml:"rename_attributes"`
+	AddAttributes       *AttributeMapForMetrics               `yaml:"add_attributes"`
+	DuplicateAttributes *AttributeMapForMetrics               `yaml:"duplicate_attributes"`
+	Split               *SplitMetric                          `yaml:"split"`
+	Merge               *MergeMetric                          `yaml:"merge"`
+	ToDelta             []types.MetricName                    `yaml:"to_delta"`
 }
 
-type LabelMapForMetrics struct {
+type AttributeMapForMetrics struct {
 	ApplyToMetrics []types.MetricName `yaml:"apply_to_metrics"`
-	LabelMap       map[string]string  `yaml:"label_map"`
+	AttributeMap   map[string]string  `yaml:"label_map"`
 }
 
 type SplitMetric struct {
-	ApplyToMetric   types.MetricName                      `yaml:"apply_to_metric"`
-	ByLabel         string                                `yaml:"by_label"`
-	LabelsToMetrics map[types.LabelValue]types.MetricName `yaml:"labels_to_metrics"`
+	ApplyToMetric       types.MetricName                          `yaml:"apply_to_metric"`
+	ByAttribute         types.AttributeName                       `yaml:"by_attribute"`
+	AttributesToMetrics map[types.MetricName]types.AttributeValue `yaml:"metrics_from_attributes"`
 }
 
 type MergeMetric struct {
-	CreateMetric     types.MetricName                      `yaml:"create_metric"`
-	ByLabel          string                                `yaml:"by_label"`
-	LabelsForMetrics map[types.LabelValue]types.MetricName `yaml:"labels_for_metrics"`
+	CreateMetric         types.MetricName                          `yaml:"create_metric"`
+	ByAttribute          string                                    `yaml:"by_attribute"`
+	AttributesForMetrics map[types.MetricName]types.AttributeValue `yaml:"attributes_for_metrics"`
 }
 
 type MetricSchema struct {
@@ -40,10 +40,10 @@ type MetricSchema struct {
 	ValueType   string `yaml:"value_type"`
 	Temporality string
 	Monotonic   bool
-	Labels      map[string]LabelSchema
+	Attributes  map[string]AttributesSchema
 }
 
-type LabelSchema struct {
+type AttributesSchema struct {
 	Values      []string
 	Description string
 	Required    string
