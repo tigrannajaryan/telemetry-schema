@@ -250,6 +250,9 @@ func (g *Generator) genInt64Timeseries(
 		for k := 0; k < valuesPerTimeseries; k++ {
 			pointTs := TimeToTimestamp(startTime.Add(time.Duration(j*k) * time.Millisecond))
 
+			m := map[string]bool{}
+			m["http.status_code"] = true
+
 			point := otlpmetric.Int64DataPoint{
 				TimeUnixNano: pointTs,
 				Value:        int64(offset * j * k),
@@ -265,10 +268,17 @@ func (g *Generator) genInt64Timeseries(
 				point.StartTimeUnixNano = pointTs
 			}
 
-			for l := len(point.Labels); l < metricLabelCount; l++ {
+			for l := len(point.Labels); l < metricLabelCount; {
+				attrName := GenRandAttrName(g.random)
+				if m[attrName] {
+					continue
+				}
+				m[attrName] = true
+				l++
+
 				point.Labels = append(
 					point.Labels, &otlpcommon.StringKeyValue{
-						Key:   GenRandAttrName(g.random),
+						Key:   attrName,
 						Value: strconv.Itoa(j),
 					},
 				)
