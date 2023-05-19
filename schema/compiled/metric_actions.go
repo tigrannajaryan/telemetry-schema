@@ -5,6 +5,7 @@ import (
 
 	otlpcommon "github.com/open-telemetry/opentelemetry-proto/gen/go/common/v1"
 	otlpmetric "github.com/open-telemetry/opentelemetry-proto/gen/go/metrics/v1"
+
 	"github.com/tigrannajaryan/telemetry-schema/schema/types"
 )
 
@@ -59,7 +60,7 @@ func (act MetricLabelRenameAction) Apply(metrics []*otlpmetric.Metric) (
 
 func renameLabels(labels []*otlpcommon.StringKeyValue, renameRules map[string]string) error {
 	var err error
-	newLabels := map[string]string{}
+	newLabels := newFastMapStr(len(labels))
 	converted := false
 	for _, label := range labels {
 		k := label.Key
@@ -67,18 +68,13 @@ func renameLabels(labels []*otlpcommon.StringKeyValue, renameRules map[string]st
 			k = string(convertTo)
 			converted = true
 		}
-		if _, exists := newLabels[k]; exists {
+		if exists := newLabels.exists(k); exists {
 			err = fmt.Errorf("label %s conflicts", k)
 		}
-		newLabels[k] = label.Value
+		newLabels.set(k, label.Value)
 	}
 	if converted {
-		i := 0
-		for k, v := range newLabels {
-			labels[i].Key = k
-			labels[i].Value = v
-			i++
-		}
+		newLabels.copyTo(labels)
 	}
 	return err
 }

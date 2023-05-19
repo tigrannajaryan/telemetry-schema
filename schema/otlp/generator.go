@@ -244,7 +244,7 @@ func (g *Generator) genInt64Timeseries(
 	startTime time.Time, offset int, valuesPerTimeseries int,
 ) []*otlpmetric.Int64DataPoint {
 	var timeseries []*otlpmetric.Int64DataPoint
-	for j := 0; j < 5; j++ {
+	for j := 0; j < 1; j++ {
 		var points []*otlpmetric.Int64DataPoint
 
 		for k := 0; k < valuesPerTimeseries; k++ {

@@ -3,6 +3,7 @@ package schema
 import (
 	"log"
 	"runtime"
+	"strconv"
 	"testing"
 
 	"github.com/golang/protobuf/proto"
@@ -155,5 +156,21 @@ func decode(bytes []byte, pb proto.Message) {
 	err := proto.Unmarshal(bytes, pb)
 	if err != nil {
 		log.Fatal(err)
+	}
+}
+
+func BenchmarkMap(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		for j := 0; j < 100; j++ {
+			m := map[string]string{}
+			m[strconv.Itoa(j)] = "def"
+			l := 0
+			for k, v := range m {
+				l++
+				k = v
+				k = k
+			}
+			l = l
+		}
 	}
 }
