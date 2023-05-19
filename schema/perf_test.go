@@ -36,68 +36,73 @@ func BenchmarkGenerate(b *testing.B) {
 	b.SkipNow()
 
 	for _, batchType := range batchTypes {
-		b.Run(batchType.name, func(b *testing.B) {
-			gen := otlp.NewGenerator()
-			for i := 0; i < b.N; i++ {
-				batches := batchType.batchGen(gen)
-				if batches == nil {
-					// Unsupported test type and batch type combination.
-					b.SkipNow()
-					return
+		b.Run(
+			batchType.name, func(b *testing.B) {
+				gen := otlp.NewGenerator()
+				for i := 0; i < b.N; i++ {
+					batches := batchType.batchGen(gen)
+					if batches == nil {
+						// Unsupported test type and batch type combination.
+						b.SkipNow()
+						return
+					}
 				}
-			}
-		})
+			},
+		)
 	}
 }
 
 func BenchmarkEncode(b *testing.B) {
 
 	for _, batchType := range batchTypes {
-		b.Run(batchType.name, func(b *testing.B) {
-			b.StopTimer()
-			gen := otlp.NewGenerator()
-			batches := batchType.batchGen(gen)
-			if batches == nil {
-				// Unsupported test type and batch type combination.
-				b.SkipNow()
-				return
-			}
-
-			runtime.GC()
-			b.StartTimer()
-			for i := 0; i < b.N; i++ {
-				for _, batch := range batches {
-					encode(batch)
+		b.Run(
+			batchType.name, func(b *testing.B) {
+				b.StopTimer()
+				gen := otlp.NewGenerator()
+				batches := batchType.batchGen(gen)
+				if batches == nil {
+					// Unsupported test type and batch type combination.
+					b.SkipNow()
+					return
 				}
-			}
-		})
+
+				runtime.GC()
+				b.StartTimer()
+				for i := 0; i < b.N; i++ {
+					for _, batch := range batches {
+						encode(batch)
+					}
+				}
+			},
+		)
 	}
 }
 
 func BenchmarkDecode(b *testing.B) {
 	for _, batchType := range batchTypes {
-		b.Run(batchType.name, func(b *testing.B) {
-			b.StopTimer()
-			batches := batchType.batchGen(otlp.NewGenerator())
-			if batches == nil {
-				// Unsupported test type and batch type combination.
-				b.SkipNow()
-				return
-			}
-
-			var encodedBytes [][]byte
-			for _, batch := range batches {
-				encodedBytes = append(encodedBytes, encode(batch))
-			}
-
-			runtime.GC()
-			b.StartTimer()
-			for i := 0; i < b.N; i++ {
-				for j, bytes := range encodedBytes {
-					decode(bytes, batches[j].(proto.Message))
+		b.Run(
+			batchType.name, func(b *testing.B) {
+				batches := batchType.batchGen(otlp.NewGenerator())
+				if batches == nil {
+					// Unsupported test type and batch type combination.
+					b.SkipNow()
+					return
 				}
-			}
-		})
+
+				var encodedBytes [][]byte
+				for _, batch := range batches {
+					encodedBytes = append(encodedBytes, encode(batch))
+				}
+
+				runtime.GC()
+				b.ResetTimer()
+				for i := 0; i < b.N; i++ {
+					for j, bytes := range encodedBytes {
+						decode(bytes, batches[j].(proto.Message))
+					}
+				}
+			},
+		)
 	}
 }
 
@@ -108,30 +113,31 @@ func BenchmarkDecodeAndConvertSchema(b *testing.B) {
 	schema := Compile(ast)
 
 	for _, batchType := range batchTypes {
-		b.Run(batchType.name, func(b *testing.B) {
-			b.StopTimer()
-			batches := batchType.batchGen(otlp.NewGenerator())
-			if batches == nil {
-				// Unsupported test type and batch type combination.
-				b.SkipNow()
-				return
-			}
-
-			var encodedBytes [][]byte
-			for _, batch := range batches {
-				encodedBytes = append(encodedBytes, encode(batch))
-			}
-
-			runtime.GC()
-			b.StartTimer()
-			for i := 0; i < b.N; i++ {
-				for j, bytes := range encodedBytes {
-					msg := batches[j].(proto.Message)
-					decode(bytes, msg)
-					converter.ConvertRequest(msg.(otlp.ExportRequest), schema)
+		b.Run(
+			batchType.name, func(b *testing.B) {
+				batches := batchType.batchGen(otlp.NewGenerator())
+				if batches == nil {
+					// Unsupported test type and batch type combination.
+					b.SkipNow()
+					return
 				}
-			}
-		})
+
+				var encodedBytes [][]byte
+				for _, batch := range batches {
+					encodedBytes = append(encodedBytes, encode(batch))
+				}
+
+				runtime.GC()
+				b.ResetTimer()
+				for i := 0; i < b.N; i++ {
+					for j, bytes := range encodedBytes {
+						msg := batches[j].(proto.Message)
+						decode(bytes, msg)
+						converter.ConvertRequest(msg.(otlp.ExportRequest), schema)
+					}
+				}
+			},
+		)
 	}
 }
 
