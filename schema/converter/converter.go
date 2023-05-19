@@ -9,24 +9,22 @@ import (
 	"github.com/tigrannajaryan/telemetry-schema/schema/otlp"
 )
 
-func convertResource(resource *otlpresource.Resource, schema *compiled.Schema) compiled.ApplyResult {
-	return schema.ConvertResourceToLatest("0.0.0", resource)
+func convertResource(resource *otlpresource.Resource, schema *compiled.Schema, changes *compiled.ApplyResult) {
+	schema.ConvertResourceToLatest("0.0.0", resource, changes)
 }
 
 func convertTraceRequest(
-	request *otlptracecol.ExportTraceServiceRequest, schema *compiled.Schema,
-) (changes compiled.ApplyResult) {
+	request *otlptracecol.ExportTraceServiceRequest, schema *compiled.Schema, changes *compiled.ApplyResult,
+) {
 	for _, rss := range request.ResourceSpans {
-		change := convertResource(rss.Resource, schema)
-		changes.Merge(change)
-		if change.IsError() {
+		convertResource(rss.Resource, schema, changes)
+		if changes.IsError() {
 			return
 		}
 
 		for _, ils := range rss.InstrumentationLibrarySpans {
-			r := schema.ConvertSpansToLatest("0.0.0", ils.Spans)
-			changes.Merge(r)
-			if r.IsError() {
+			schema.ConvertSpansToLatest("0.0.0", ils.Spans, changes)
+			if changes.IsError() {
 				return
 			}
 		}
@@ -35,10 +33,10 @@ func convertTraceRequest(
 }
 
 func convertMetricRequest(
-	request *otlpmetriccol.ExportMetricsServiceRequest, schema *compiled.Schema,
+	request *otlpmetriccol.ExportMetricsServiceRequest, schema *compiled.Schema, changes *compiled.ApplyResult,
 ) {
 	for _, rss := range request.ResourceMetrics {
-		convertResource(rss.Resource, schema)
+		convertResource(rss.Resource, schema, changes)
 		for _, ils := range rss.InstrumentationLibraryMetrics {
 			if err := schema.ConvertMetricsToLatest("0.0.0", &ils.Metrics); err != nil {
 				// logger.Debug("Conversion error", zap.Error(err))
@@ -47,12 +45,11 @@ func convertMetricRequest(
 	}
 }
 
-func ConvertRequest(request otlp.ExportRequest, schema *compiled.Schema) compiled.ApplyResult {
+func ConvertRequest(request otlp.ExportRequest, schema *compiled.Schema, changes *compiled.ApplyResult) {
 	switch r := request.(type) {
 	case *otlptracecol.ExportTraceServiceRequest:
-		return convertTraceRequest(r, schema)
+		convertTraceRequest(r, schema, changes)
 	case *otlpmetriccol.ExportMetricsServiceRequest:
-		convertMetricRequest(r, schema)
+		convertMetricRequest(r, schema, changes)
 	}
-	return compiled.ApplyResult{}
 }

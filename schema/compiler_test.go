@@ -46,7 +46,7 @@ func getAttr(attrs []*otlpcommon.KeyValue, key string) (*otlpcommon.AnyValue, bo
 }
 
 func TestResourceSchemaConversion(t *testing.T) {
-	compiled := compileTestSchema(t)
+	schema := compileTestSchema(t)
 
 	resource := &otlpresource.Resource{}
 	resource.Attributes = []*otlpcommon.KeyValue{
@@ -64,8 +64,9 @@ func TestResourceSchemaConversion(t *testing.T) {
 		},
 	}
 	resource2 := proto.Clone(resource).(*otlpresource.Resource)
-	err := compiled.ConvertResourceToLatest("0.0.0", resource2)
-	assert.False(t, err.IsError())
+	changes := compiled.ApplyResult{}
+	schema.ConvertResourceToLatest("0.0.0", resource2, &changes)
+	assert.False(t, changes.IsError())
 
 	assert.EqualValues(t, 3, len(resource2.Attributes))
 
@@ -93,7 +94,7 @@ func TestResourceSchemaConversion(t *testing.T) {
 }
 
 func TestResourceSchemaConversionConflict(t *testing.T) {
-	compiled := compileTestSchema(t)
+	schema := compileTestSchema(t)
 
 	resource1 := &otlpresource.Resource{}
 	resource1.Attributes = []*otlpcommon.KeyValue{
@@ -127,7 +128,8 @@ func TestResourceSchemaConversionConflict(t *testing.T) {
 
 	requestCopy := proto.Clone(request)
 
-	changes := converter.ConvertRequest(request, compiled)
+	changes := &compiled.ApplyResult{}
+	converter.ConvertRequest(request, schema, changes)
 	assert.True(t, changes.IsError())
 	assert.False(t, proto.Equal(request, requestCopy))
 
@@ -238,7 +240,7 @@ func TestMetricsSchemaConversion(t *testing.T) {
 }
 
 func BenchmarkResourceSchemaConversion(b *testing.B) {
-	compiled := compileTestSchema(b)
+	schema := compileTestSchema(b)
 
 	var resources []*otlpresource.Resource
 	for i := 0; i < b.N; i++ {
@@ -273,7 +275,8 @@ func BenchmarkResourceSchemaConversion(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		err := compiled.ConvertResourceToLatest("0.0.0", resources[i])
-		assert.False(b, err.IsError())
+		changes := compiled.ApplyResult{}
+		schema.ConvertResourceToLatest("0.0.0", resources[i], &changes)
+		assert.False(b, changes.IsError())
 	}
 }

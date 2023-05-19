@@ -8,7 +8,7 @@ import (
 
 type AttributesRenameAction map[string]string
 
-func (at AttributesRenameAction) Apply(attrs []*otlpcommon.KeyValue) (changes ApplyResult) {
+func (at AttributesRenameAction) Apply(attrs []*otlpcommon.KeyValue, changes *ApplyResult) {
 	var err error
 	newAttrs := newFastMap(len(attrs))
 	converted := false
@@ -42,8 +42,6 @@ func (at AttributesRenameAction) Apply(attrs []*otlpcommon.KeyValue) (changes Ap
 
 		newAttrs.copyTo(attrs)
 	}
-
-	return changes
 }
 
 type rollbacker struct {

@@ -8,6 +8,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/require"
 
+	"github.com/tigrannajaryan/telemetry-schema/schema/compiled"
 	"github.com/tigrannajaryan/telemetry-schema/schema/converter"
 	"github.com/tigrannajaryan/telemetry-schema/schema/otlp"
 )
@@ -116,7 +117,8 @@ func BenchmarkConvertSchema(b *testing.B) {
 
 				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
-					converter.ConvertRequest(msgs[i].(otlp.ExportRequest), schema)
+					changes := compiled.ApplyResult{}
+					converter.ConvertRequest(msgs[i].(otlp.ExportRequest), schema, &changes)
 				}
 			},
 		)

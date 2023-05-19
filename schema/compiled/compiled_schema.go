@@ -28,15 +28,13 @@ type ActionsForVersion struct {
 
 type ResourceActions []ResourceAction
 
-func (acts ResourceActions) Apply(resource *otlpresource.Resource) (changes ApplyResult) {
+func (acts ResourceActions) Apply(resource *otlpresource.Resource, changes *ApplyResult) {
 	for _, a := range acts {
-		change := a.Apply(resource)
-		changes.Merge(change)
-		if change.IsError() {
+		a.Apply(resource, changes)
+		if changes.IsError() {
 			break
 		}
 	}
-	return changes
 }
 
 type MetricActions struct {
@@ -55,7 +53,7 @@ func (acts MetricActions) Apply(metrics []*otlpmetric.Metric) ([]*otlpmetric.Met
 }
 
 type ResourceAction interface {
-	Apply(resource *otlpresource.Resource) ApplyResult
+	Apply(resource *otlpresource.Resource, changes *ApplyResult)
 }
 
 type ApplyResult struct {
@@ -93,22 +91,20 @@ func (ar *ApplyResult) AppendError(err error) {
 }
 
 type SpanAction interface {
-	Apply(trace *otlptrace.Span) ApplyResult
+	Apply(trace *otlptrace.Span, changes *ApplyResult)
 }
 
 type SpanActions struct {
 	ForAllSpans []SpanAction
 }
 
-func (acts SpanActions) Apply(span *otlptrace.Span) (changes ApplyResult) {
+func (acts SpanActions) Apply(span *otlptrace.Span, changes *ApplyResult) {
 	for _, a := range acts.ForAllSpans {
-		change := a.Apply(span)
-		changes.Merge(change)
-		if change.IsError() {
+		a.Apply(span, changes)
+		if changes.IsError() {
 			break
 		}
 	}
-	return changes
 }
 
 type MetricAction interface {
@@ -132,8 +128,8 @@ func (afv ActionsForVersions) Swap(i, j int) {
 }
 
 func (s *Schema) ConvertResourceToLatest(
-	fromVersion types.TelemetryVersion, resource *otlpresource.Resource,
-) (changes ApplyResult) {
+	fromVersion types.TelemetryVersion, resource *otlpresource.Resource, changes *ApplyResult,
+) {
 	startIndex := sort.Search(
 		len(s.Versions), func(i int) bool {
 			// TODO: use proper semver comparison.
@@ -146,9 +142,8 @@ func (s *Schema) ConvertResourceToLatest(
 	}
 
 	for i := startIndex; i < len(s.Versions); i++ {
-		change := s.Versions[i].Resource.Apply(resource)
-		changes.Merge(change)
-		if change.IsError() {
+		s.Versions[i].Resource.Apply(resource, changes)
+		if changes.IsError() {
 			break
 		}
 	}
@@ -157,8 +152,8 @@ func (s *Schema) ConvertResourceToLatest(
 }
 
 func (s *Schema) ConvertSpansToLatest(
-	fromVersion types.TelemetryVersion, spans []*otlptrace.Span,
-) (ret ApplyResult) {
+	fromVersion types.TelemetryVersion, spans []*otlptrace.Span, changes *ApplyResult,
+) {
 	startIndex := sort.Search(
 		len(s.Versions), func(i int) bool {
 			// TODO: use proper semver comparison.
@@ -167,21 +162,18 @@ func (s *Schema) ConvertSpansToLatest(
 	)
 	if startIndex > len(s.Versions) {
 		// Nothing to do
-		return ret
+		return
 	}
 
 	for i := startIndex; i < len(s.Versions); i++ {
 		for j := 0; j < len(spans); j++ {
 			span := spans[j]
-			r := s.Versions[i].Spans.Apply(span)
-			ret.Merge(r)
-			if r.IsError() {
-				return ret
+			s.Versions[i].Spans.Apply(span, changes)
+			if changes.IsError() {
+				return
 			}
 		}
 	}
-
-	return ret
 }
 
 func (s *Schema) ConvertMetricsToLatest(
