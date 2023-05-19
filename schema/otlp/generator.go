@@ -294,7 +294,7 @@ func (g *Generator) genInt64Timeseries(
 }
 
 func (g *Generator) genInt64Gauge(
-	startTime time.Time, i int, labelKeys []string, valuesPerTimeseries int,
+	startTime time.Time, i int, valuesPerTimeseries int,
 ) *otlpmetric.Metric {
 	descr := GenMetricDescriptor(i)
 
@@ -344,13 +344,8 @@ func (g *Generator) GenerateMetricBatch(
 	for i := 0; i < metricsPerBatch; i++ {
 		startTime := time.Date(2019, 10, 31, 10, 11, 12, 13, time.UTC)
 
-		labelKeys := []string{
-			"label1",
-			"label2",
-		}
-
 		if int64 {
-			il.Metrics = append(il.Metrics, g.genInt64Gauge(startTime, i, labelKeys, valuesPerTimeseries))
+			il.Metrics = append(il.Metrics, g.genInt64Gauge(startTime, i, valuesPerTimeseries))
 		}
 	}
 	return batch
