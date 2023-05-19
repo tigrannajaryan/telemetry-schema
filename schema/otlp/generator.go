@@ -47,28 +47,54 @@ func (g *Generator) genRandByteString(len int) string {
 func (g *Generator) GenResource() *otlpresource.Resource {
 	res := &otlpresource.Resource{
 		Attributes: []*otlpcommon.KeyValue{
-			{Key: "StartTimeUnixnano", Value: &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_IntValue{IntValue: 12345678}}},
+			{
+				Key:   "StartTimeUnixnano",
+				Value: &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_IntValue{IntValue: 12345678}},
+			},
 			{Key: "Pid", Value: &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_IntValue{IntValue: 1234}}},
-			{Key: "HostName", Value: &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_StringValue{StringValue: "fakehost"}}},
-			{Key: "service.name", Value: &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_StringValue{StringValue: "generator"}}},
-			{Key: "service.namespace", Value: &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_StringValue{StringValue: "MyTeam"}}},
-			{Key: "telemetry.auto.version", Value: &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_StringValue{"1.2.3"}}},
+			{
+				Key:   "HostName",
+				Value: &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_StringValue{StringValue: "fakehost"}},
+			},
+			{
+				Key:   "service.name",
+				Value: &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_StringValue{StringValue: "generator"}},
+			},
+			{
+				Key:   "service.namespace",
+				Value: &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_StringValue{StringValue: "MyTeam"}},
+			},
+			{
+				Key:   "telemetry.auto.version",
+				Value: &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_StringValue{"1.2.3"}},
+			},
 		},
 	}
 
-	for i := len(res.Attributes); i < attrsPerResource; i++ {
+	m := map[string]bool{}
+	for i := len(res.Attributes); i < attrsPerResource; {
 		attrName := GenRandAttrName(g.random)
-		res.Attributes = append(res.Attributes,
+		if m[attrName] {
+			continue
+		}
+		m[attrName] = true
+		i++
+
+		res.Attributes = append(
+			res.Attributes,
 			&otlpcommon.KeyValue{
 				Key:   attrName,
 				Value: &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_StringValue{StringValue: g.genRandByteString(g.random.Intn(20) + 1)}},
-			})
+			},
+		)
 	}
 
 	return res
 }
 
-func (g *Generator) GenerateSpanBatch(spansPerBatch int, attrsPerSpan int, timedEventsPerSpan int) *otlptracecol.ExportTraceServiceRequest {
+func (g *Generator) GenerateSpanBatch(
+	spansPerBatch int, attrsPerSpan int, timedEventsPerSpan int,
+) *otlptracecol.ExportTraceServiceRequest {
 	traceID := atomic.AddUint64(&g.tracesSent, 1)
 
 	il := &otlptrace.InstrumentationLibrarySpans{
@@ -103,42 +129,62 @@ func (g *Generator) GenerateSpanBatch(spansPerBatch int, attrsPerSpan int, timed
 			span.Attributes = []*otlpcommon.KeyValue{}
 
 			if attrsPerSpan >= 3 {
-				span.Attributes = append(span.Attributes,
+				span.Attributes = append(
+					span.Attributes,
 					&otlpcommon.KeyValue{
 						Key:   "load_generator.span_seq_num",
 						Value: &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_IntValue{IntValue: int64(spanID)}},
-					})
-				span.Attributes = append(span.Attributes,
+					},
+				)
+				span.Attributes = append(
+					span.Attributes,
 					&otlpcommon.KeyValue{
 						Key:   "load_generator.trace_seq_num",
 						Value: &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_IntValue{IntValue: int64(traceID)}},
-					})
-				span.Attributes = append(span.Attributes,
+					},
+				)
+				span.Attributes = append(
+					span.Attributes,
 					&otlpcommon.KeyValue{
 						Key:   "k8s.pod.name",
 						Value: &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_StringValue{StringValue: "superpod-123"}},
-					})
+					},
+				)
 			}
 
+			m := map[string]bool{}
 			for j := len(span.Attributes); j < attrsPerSpan; j++ {
 				attrName := GenRandAttrName(g.random)
-				span.Attributes = append(span.Attributes,
+				if m[attrName] {
+					continue
+				}
+				m[attrName] = true
+				i++
+
+				span.Attributes = append(
+					span.Attributes,
 					&otlpcommon.KeyValue{
 						Key:   attrName,
 						Value: &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_StringValue{StringValue: g.genRandByteString(g.random.Intn(20) + 1)}},
-					})
+					},
+				)
 			}
 		}
 
 		if timedEventsPerSpan > 0 {
 			for i := 0; i < timedEventsPerSpan; i++ {
-				span.Events = append(span.Events, &otlptrace.Span_Event{
-					TimeUnixNano: TimeToTimestamp(startTime.Add(time.Duration(i) * time.Millisecond)),
-					// TimeStartDeltaNano: (time.Duration(i) * time.Millisecond).Nanoseconds(),
-					Attributes: []*otlpcommon.KeyValue{
-						{Key: "te", Value: &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_IntValue{IntValue: int64(spanID)}}},
+				span.Events = append(
+					span.Events, &otlptrace.Span_Event{
+						TimeUnixNano: TimeToTimestamp(startTime.Add(time.Duration(i) * time.Millisecond)),
+						// TimeStartDeltaNano: (time.Duration(i) * time.Millisecond).Nanoseconds(),
+						Attributes: []*otlpcommon.KeyValue{
+							{
+								Key:   "te",
+								Value: &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_IntValue{IntValue: int64(spanID)}},
+							},
+						},
 					},
-				})
+				)
 			}
 		}
 
@@ -194,7 +240,9 @@ func (g *Generator) GenerateLogBatch(logsPerBatch int, attrsPerLog int) ExportRe
 	return nil
 }
 
-func (g *Generator) genInt64Timeseries(startTime time.Time, offset int, valuesPerTimeseries int) []*otlpmetric.Int64DataPoint {
+func (g *Generator) genInt64Timeseries(
+	startTime time.Time, offset int, valuesPerTimeseries int,
+) []*otlpmetric.Int64DataPoint {
 	var timeseries []*otlpmetric.Int64DataPoint
 	for j := 0; j < 5; j++ {
 		var points []*otlpmetric.Int64DataPoint
@@ -218,10 +266,12 @@ func (g *Generator) genInt64Timeseries(startTime time.Time, offset int, valuesPe
 			}
 
 			for l := len(point.Labels); l < metricLabelCount; l++ {
-				point.Labels = append(point.Labels, &otlpcommon.StringKeyValue{
-					Key:   GenRandAttrName(g.random),
-					Value: strconv.Itoa(j),
-				})
+				point.Labels = append(
+					point.Labels, &otlpcommon.StringKeyValue{
+						Key:   GenRandAttrName(g.random),
+						Value: strconv.Itoa(j),
+					},
+				)
 			}
 
 			points = append(points, &point)
@@ -233,7 +283,9 @@ func (g *Generator) genInt64Timeseries(startTime time.Time, offset int, valuesPe
 	return timeseries
 }
 
-func (g *Generator) genInt64Gauge(startTime time.Time, i int, labelKeys []string, valuesPerTimeseries int) *otlpmetric.Metric {
+func (g *Generator) genInt64Gauge(
+	startTime time.Time, i int, labelKeys []string, valuesPerTimeseries int,
+) *otlpmetric.Metric {
 	descr := GenMetricDescriptor(i)
 
 	metric1 := &otlpmetric.Metric{
