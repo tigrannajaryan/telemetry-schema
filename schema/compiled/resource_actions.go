@@ -6,6 +6,6 @@ import (
 
 type ResourceAttributesRenameAction AttributesRenameAction
 
-func (rt ResourceAttributesRenameAction) Apply(resource *otlpresource.Resource) error {
+func (rt ResourceAttributesRenameAction) Apply(resource *otlpresource.Resource) ApplyResult {
 	return AttributesRenameAction(rt).Apply(resource.Attributes)
 }

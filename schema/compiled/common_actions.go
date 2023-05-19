@@ -8,7 +8,7 @@ import (
 
 type AttributesRenameAction map[string]string
 
-func (at AttributesRenameAction) Apply(attrs []*otlpcommon.KeyValue) error {
+func (at AttributesRenameAction) Apply(attrs []*otlpcommon.KeyValue) (changes ApplyResult) {
 	var err error
 	newAttrs := newFastMap(len(attrs))
 	converted := false
@@ -21,13 +21,40 @@ func (at AttributesRenameAction) Apply(attrs []*otlpcommon.KeyValue) error {
 		}
 		if newAttrs.exists(k) {
 			err = fmt.Errorf("label %s conflicts", k)
+			changes.AppendError(err)
 		}
 		newAttrs.set(k, attr.Value)
 	}
 	if converted && err == nil {
+		preserve := make([]otlpcommon.KeyValue, len(attrs))
+		for i := 0; i < len(attrs); i++ {
+			preserve[i] = *attrs[i]
+		}
+
+		changes.Append(
+			rollbacker{attrs, preserve},
+			//func() {
+			//	for i := 0; i < len(preserve); i++ {
+			//		*attrs[i] = preserve[i]
+			//	}
+			//},
+		)
+
 		newAttrs.copyTo(attrs)
 	}
-	return err
+
+	return changes
+}
+
+type rollbacker struct {
+	attrs    []*otlpcommon.KeyValue
+	preserve []otlpcommon.KeyValue
+}
+
+func (r rollbacker) Rollback() {
+	for i := 0; i < len(r.preserve); i++ {
+		*r.attrs[i] = r.preserve[i]
+	}
 }
 
 /*func (at AttributesRenameAction) Apply(attrs pdata.AttributeMap) error {

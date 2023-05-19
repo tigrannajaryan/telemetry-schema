@@ -2,7 +2,6 @@ package schema
 
 import (
 	"log"
-	"runtime"
 	"strconv"
 	"testing"
 
@@ -56,7 +55,6 @@ func BenchmarkEncode(b *testing.B) {
 	for _, batchType := range batchTypes {
 		b.Run(
 			batchType.name, func(b *testing.B) {
-				b.StopTimer()
 				gen := otlp.NewGenerator()
 				batch := batchType.batchGen(gen)
 				if batch == nil {
@@ -65,8 +63,7 @@ func BenchmarkEncode(b *testing.B) {
 					return
 				}
 
-				runtime.GC()
-				b.StartTimer()
+				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
 					encode(batch)
 				}
@@ -88,7 +85,6 @@ func BenchmarkDecode(b *testing.B) {
 
 				encodedBytes := encode(batch)
 
-				runtime.GC()
 				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
 					decode(encodedBytes, batch.(proto.Message))
@@ -118,7 +114,6 @@ func BenchmarkConvertSchema(b *testing.B) {
 					msgs = append(msgs, msg)
 				}
 
-				runtime.GC()
 				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
 					converter.ConvertRequest(msgs[i].(otlp.ExportRequest), schema)

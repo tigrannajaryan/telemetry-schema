@@ -6,6 +6,7 @@ import (
 	otlpmetric "github.com/open-telemetry/opentelemetry-proto/gen/go/metrics/v1"
 	otlpresource "github.com/open-telemetry/opentelemetry-proto/gen/go/resource/v1"
 	otlptrace "github.com/open-telemetry/opentelemetry-proto/gen/go/trace/v1"
+
 	"github.com/tigrannajaryan/telemetry-schema/schema/types"
 )
 
@@ -27,14 +28,15 @@ type ActionsForVersion struct {
 
 type ResourceActions []ResourceAction
 
-func (acts ResourceActions) Apply(resource *otlpresource.Resource) error {
+func (acts ResourceActions) Apply(resource *otlpresource.Resource) (changes ApplyResult) {
 	for _, a := range acts {
-		err := a.Apply(resource)
-		if err != nil {
-			return err
+		change := a.Apply(resource)
+		changes.Merge(change)
+		if change.IsError() {
+			break
 		}
 	}
-	return nil
+	return changes
 }
 
 type MetricActions struct {
@@ -53,25 +55,60 @@ func (acts MetricActions) Apply(metrics []*otlpmetric.Metric) ([]*otlpmetric.Met
 }
 
 type ResourceAction interface {
-	Apply(resource *otlpresource.Resource) error
+	Apply(resource *otlpresource.Resource) ApplyResult
+}
+
+type ApplyResult struct {
+	errs     []error
+	rollback []Rollbacker
+}
+
+type Rollbacker interface {
+	Rollback()
+}
+
+func (ar *ApplyResult) IsError() bool {
+	return len(ar.errs) > 0
+}
+
+func (ar *ApplyResult) Merge(next ApplyResult) {
+	ar.rollback = append(ar.rollback, next.rollback...)
+	ar.errs = append(ar.errs, next.errs...)
+}
+
+func (ar *ApplyResult) Rollback() {
+	for i := len(ar.rollback) - 1; i >= 0; i-- {
+		ar.rollback[i].Rollback()
+	}
+}
+
+func (ar *ApplyResult) Append(f Rollbacker) {
+	ar.rollback = append(ar.rollback, f)
+}
+
+func (ar *ApplyResult) AppendError(err error) {
+	if err != nil {
+		ar.errs = append(ar.errs, err)
+	}
 }
 
 type SpanAction interface {
-	Apply(trace *otlptrace.Span) error
+	Apply(trace *otlptrace.Span) ApplyResult
 }
 
 type SpanActions struct {
 	ForAllSpans []SpanAction
 }
 
-func (acts SpanActions) Apply(span *otlptrace.Span) error {
+func (acts SpanActions) Apply(span *otlptrace.Span) (changes ApplyResult) {
 	for _, a := range acts.ForAllSpans {
-		err := a.Apply(span)
-		if err != nil {
-			return err
+		change := a.Apply(span)
+		changes.Merge(change)
+		if change.IsError() {
+			break
 		}
 	}
-	return nil
+	return changes
 }
 
 type MetricAction interface {
@@ -96,7 +133,7 @@ func (afv ActionsForVersions) Swap(i, j int) {
 
 func (s *Schema) ConvertResourceToLatest(
 	fromVersion types.TelemetryVersion, resource *otlpresource.Resource,
-) error {
+) (changes ApplyResult) {
 	startIndex := sort.Search(
 		len(s.Versions), func(i int) bool {
 			// TODO: use proper semver comparison.
@@ -105,21 +142,23 @@ func (s *Schema) ConvertResourceToLatest(
 	)
 	if startIndex > len(s.Versions) {
 		// Nothing to do
-		return nil
+		return
 	}
 
 	for i := startIndex; i < len(s.Versions); i++ {
-		if err := s.Versions[i].Resource.Apply(resource); err != nil {
-			return err
+		change := s.Versions[i].Resource.Apply(resource)
+		changes.Merge(change)
+		if change.IsError() {
+			break
 		}
 	}
 
-	return nil
+	return
 }
 
 func (s *Schema) ConvertSpansToLatest(
 	fromVersion types.TelemetryVersion, spans []*otlptrace.Span,
-) error {
+) (ret ApplyResult) {
 	startIndex := sort.Search(
 		len(s.Versions), func(i int) bool {
 			// TODO: use proper semver comparison.
@@ -128,19 +167,21 @@ func (s *Schema) ConvertSpansToLatest(
 	)
 	if startIndex > len(s.Versions) {
 		// Nothing to do
-		return nil
+		return ret
 	}
 
 	for i := startIndex; i < len(s.Versions); i++ {
 		for j := 0; j < len(spans); j++ {
 			span := spans[j]
-			if err := s.Versions[i].Spans.Apply(span); err != nil {
-				return err
+			r := s.Versions[i].Spans.Apply(span)
+			ret.Merge(r)
+			if r.IsError() {
+				return ret
 			}
 		}
 	}
 
-	return nil
+	return ret
 }
 
 func (s *Schema) ConvertMetricsToLatest(

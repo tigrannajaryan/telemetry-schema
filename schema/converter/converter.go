@@ -9,21 +9,29 @@ import (
 	"github.com/tigrannajaryan/telemetry-schema/schema/otlp"
 )
 
-func convertResource(resource *otlpresource.Resource, schema *compiled.Schema) {
-	if err := schema.ConvertResourceToLatest("0.0.0", resource); err != nil {
-		// logger.Debug("Conversion error", zap.Error(err))
-	}
+func convertResource(resource *otlpresource.Resource, schema *compiled.Schema) compiled.ApplyResult {
+	return schema.ConvertResourceToLatest("0.0.0", resource)
 }
 
-func convertTraceRequest(request *otlptracecol.ExportTraceServiceRequest, schema *compiled.Schema) {
+func convertTraceRequest(
+	request *otlptracecol.ExportTraceServiceRequest, schema *compiled.Schema,
+) (changes compiled.ApplyResult) {
 	for _, rss := range request.ResourceSpans {
-		convertResource(rss.Resource, schema)
+		change := convertResource(rss.Resource, schema)
+		changes.Merge(change)
+		if change.IsError() {
+			return
+		}
+
 		for _, ils := range rss.InstrumentationLibrarySpans {
-			if err := schema.ConvertSpansToLatest("0.0.0", ils.Spans); err != nil {
-				// logger.Debug("Conversion error", zap.Error(err))
+			r := schema.ConvertSpansToLatest("0.0.0", ils.Spans)
+			changes.Merge(r)
+			if r.IsError() {
+				return
 			}
 		}
 	}
+	return
 }
 
 func convertMetricRequest(
@@ -39,11 +47,12 @@ func convertMetricRequest(
 	}
 }
 
-func ConvertRequest(request otlp.ExportRequest, schema *compiled.Schema) {
+func ConvertRequest(request otlp.ExportRequest, schema *compiled.Schema) compiled.ApplyResult {
 	switch r := request.(type) {
 	case *otlptracecol.ExportTraceServiceRequest:
-		convertTraceRequest(r, schema)
+		return convertTraceRequest(r, schema)
 	case *otlpmetriccol.ExportMetricsServiceRequest:
 		convertMetricRequest(r, schema)
 	}
+	return compiled.ApplyResult{}
 }

@@ -5,13 +5,16 @@ import (
 	"testing"
 
 	"github.com/gogo/protobuf/proto"
+	otlptracecol "github.com/open-telemetry/opentelemetry-proto/gen/go/collector/trace/v1"
 	otlpcommon "github.com/open-telemetry/opentelemetry-proto/gen/go/common/v1"
 	otlpmetric "github.com/open-telemetry/opentelemetry-proto/gen/go/metrics/v1"
 	otlpresource "github.com/open-telemetry/opentelemetry-proto/gen/go/resource/v1"
+	otlptrace "github.com/open-telemetry/opentelemetry-proto/gen/go/trace/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/tigrannajaryan/telemetry-schema/schema/compiled"
+	"github.com/tigrannajaryan/telemetry-schema/schema/converter"
 )
 
 func compileTestSchema(t testing.TB) *compiled.Schema {
@@ -62,7 +65,7 @@ func TestResourceSchemaConversion(t *testing.T) {
 	}
 	resource2 := proto.Clone(resource).(*otlpresource.Resource)
 	err := compiled.ConvertResourceToLatest("0.0.0", resource2)
-	assert.NoError(t, err)
+	assert.False(t, err.IsError())
 
 	assert.EqualValues(t, 3, len(resource2.Attributes))
 
@@ -87,6 +90,49 @@ func TestResourceSchemaConversion(t *testing.T) {
 	assert.EqualValues(
 		t, &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_StringValue{"1.2.3"}}, attrVal,
 	)
+}
+
+func TestResourceSchemaConversionConflict(t *testing.T) {
+	compiled := compileTestSchema(t)
+
+	resource1 := &otlpresource.Resource{}
+	resource1.Attributes = []*otlpcommon.KeyValue{
+		{
+			Key:   "k8s.cluster.name",
+			Value: &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_StringValue{"OnlineShop"}},
+		},
+		{
+			Key:   "telemetry.auto.version",
+			Value: &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_StringValue{"1.2.3"}},
+		},
+	}
+	resource2 := proto.Clone(resource1).(*otlpresource.Resource)
+	resource2.Attributes = append(
+		resource2.Attributes, &otlpcommon.KeyValue{
+			Key:   "kubernetes.cluster.name", // This should conflict with conversion
+			Value: &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_IntValue{123}},
+		},
+	)
+
+	request := &otlptracecol.ExportTraceServiceRequest{
+		ResourceSpans: []*otlptrace.ResourceSpans{
+			{
+				Resource: resource1,
+			},
+			{
+				Resource: resource2,
+			},
+		},
+	}
+
+	requestCopy := proto.Clone(request)
+
+	changes := converter.ConvertRequest(request, compiled)
+	assert.True(t, changes.IsError())
+	assert.False(t, proto.Equal(request, requestCopy))
+
+	changes.Rollback()
+	assert.True(t, proto.Equal(request, requestCopy))
 }
 
 func getLabel(attrs []*otlpcommon.StringKeyValue, key string) (string, bool) {
@@ -228,6 +274,6 @@ func BenchmarkResourceSchemaConversion(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		err := compiled.ConvertResourceToLatest("0.0.0", resources[i])
-		assert.NoError(b, err)
+		assert.False(b, err.IsError())
 	}
 }

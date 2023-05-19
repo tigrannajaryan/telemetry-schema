@@ -153,13 +153,17 @@ func (g *Generator) GenerateSpanBatch(
 			}
 
 			m := map[string]bool{}
-			for j := len(span.Attributes); j < attrsPerSpan; j++ {
+			for _, attr := range span.Attributes {
+				m[attr.Key] = true
+			}
+
+			for j := len(span.Attributes); j < attrsPerSpan; {
 				attrName := GenRandAttrName(g.random)
 				if m[attrName] {
 					continue
 				}
 				m[attrName] = true
-				i++
+				j++
 
 				span.Attributes = append(
 					span.Attributes,
@@ -172,10 +176,10 @@ func (g *Generator) GenerateSpanBatch(
 		}
 
 		if timedEventsPerSpan > 0 {
-			for i := 0; i < timedEventsPerSpan; i++ {
+			for k := 0; k < timedEventsPerSpan; k++ {
 				span.Events = append(
 					span.Events, &otlptrace.Span_Event{
-						TimeUnixNano: TimeToTimestamp(startTime.Add(time.Duration(i) * time.Millisecond)),
+						TimeUnixNano: TimeToTimestamp(startTime.Add(time.Duration(k) * time.Millisecond)),
 						// TimeStartDeltaNano: (time.Duration(i) * time.Millisecond).Nanoseconds(),
 						Attributes: []*otlpcommon.KeyValue{
 							{
