@@ -22,15 +22,13 @@ const attrsPerLog = attrsPerSpans
 
 var batchTypes = []struct {
 	name     string
-	batchGen func(gen *otlp.Generator) []otlp.ExportRequest
+	batchGen func(gen *otlp.Generator) otlp.ExportRequest
 }{
 	//{name: "Logs", batchGen: generateLogBatches},
 	{name: "Trace/Attribs", batchGen: generateAttrBatches},
 	//{name: "Trace/Events", batchGen: generateTimedEventBatches},
 	{name: "Metric/Int64", batchGen: generateMetricInt64Batches},
 }
-
-const BatchCount = 1
 
 func BenchmarkGenerate(b *testing.B) {
 	b.SkipNow()
@@ -59,8 +57,8 @@ func BenchmarkEncode(b *testing.B) {
 			batchType.name, func(b *testing.B) {
 				b.StopTimer()
 				gen := otlp.NewGenerator()
-				batches := batchType.batchGen(gen)
-				if batches == nil {
+				batch := batchType.batchGen(gen)
+				if batch == nil {
 					// Unsupported test type and batch type combination.
 					b.SkipNow()
 					return
@@ -69,9 +67,7 @@ func BenchmarkEncode(b *testing.B) {
 				runtime.GC()
 				b.StartTimer()
 				for i := 0; i < b.N; i++ {
-					for _, batch := range batches {
-						encode(batch)
-					}
+					encode(batch)
 				}
 			},
 		)
@@ -82,31 +78,26 @@ func BenchmarkDecode(b *testing.B) {
 	for _, batchType := range batchTypes {
 		b.Run(
 			batchType.name, func(b *testing.B) {
-				batches := batchType.batchGen(otlp.NewGenerator())
-				if batches == nil {
+				batch := batchType.batchGen(otlp.NewGenerator())
+				if batch == nil {
 					// Unsupported test type and batch type combination.
 					b.SkipNow()
 					return
 				}
 
-				var encodedBytes [][]byte
-				for _, batch := range batches {
-					encodedBytes = append(encodedBytes, encode(batch))
-				}
+				encodedBytes := encode(batch)
 
 				runtime.GC()
 				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
-					for j, bytes := range encodedBytes {
-						decode(bytes, batches[j].(proto.Message))
-					}
+					decode(encodedBytes, batch.(proto.Message))
 				}
 			},
 		)
 	}
 }
 
-func BenchmarkDecodeAndConvertSchema(b *testing.B) {
+func BenchmarkConvertSchema(b *testing.B) {
 	ast, err := Parse("testdata/schema-example.yaml")
 	require.NoError(b, err)
 
@@ -115,70 +106,41 @@ func BenchmarkDecodeAndConvertSchema(b *testing.B) {
 	for _, batchType := range batchTypes {
 		b.Run(
 			batchType.name, func(b *testing.B) {
-				batches := batchType.batchGen(otlp.NewGenerator())
-				if batches == nil {
-					// Unsupported test type and batch type combination.
-					b.SkipNow()
-					return
-				}
-
-				var encodedBytes [][]byte
-				for _, batch := range batches {
-					encodedBytes = append(encodedBytes, encode(batch))
+				var msgs []proto.Message
+				for i := 0; i < b.N; i++ {
+					msg := batchType.batchGen(otlp.NewGenerator())
+					if msg == nil {
+						// Unsupported test type and batch type combination.
+						b.SkipNow()
+						return
+					}
+					msgs = append(msgs, msg)
 				}
 
 				runtime.GC()
 				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
-					for j, bytes := range encodedBytes {
-						msg := batches[j].(proto.Message)
-						decode(bytes, msg)
-						converter.ConvertRequest(msg.(otlp.ExportRequest), schema)
-					}
+					converter.ConvertRequest(msgs[i].(otlp.ExportRequest), schema)
 				}
 			},
 		)
 	}
 }
 
-func generateAttrBatches(gen *otlp.Generator) []otlp.ExportRequest {
-	var batches []otlp.ExportRequest
-	for i := 0; i < BatchCount; i++ {
-		batches = append(batches, gen.GenerateSpanBatch(spansPerBatch, attrsPerSpans, 0))
-	}
-	return batches
+func generateAttrBatches(gen *otlp.Generator) otlp.ExportRequest {
+	return gen.GenerateSpanBatch(spansPerBatch, attrsPerSpans, 0)
 }
 
-func generateTimedEventBatches(gen *otlp.Generator) []otlp.ExportRequest {
-	var batches []otlp.ExportRequest
-	for i := 0; i < BatchCount; i++ {
-		batches = append(batches, gen.GenerateSpanBatch(spansPerBatch, 3, eventsPerSpan))
-	}
-	return batches
+func generateTimedEventBatches(gen *otlp.Generator) otlp.ExportRequest {
+	return gen.GenerateSpanBatch(spansPerBatch, 3, eventsPerSpan)
 }
 
-func generateLogBatches(gen *otlp.Generator) []otlp.ExportRequest {
-	var batches []otlp.ExportRequest
-	for i := 0; i < BatchCount; i++ {
-		batch := gen.GenerateLogBatch(logsPerBatch, attrsPerLog)
-		if batch == nil {
-			return nil
-		}
-		batches = append(batches, batch)
-	}
-	return batches
+func generateLogBatches(gen *otlp.Generator) otlp.ExportRequest {
+	return gen.GenerateLogBatch(logsPerBatch, attrsPerLog)
 }
 
-func generateMetricInt64Batches(gen *otlp.Generator) []otlp.ExportRequest {
-	var batches []otlp.ExportRequest
-	for i := 0; i < BatchCount; i++ {
-		batch := gen.GenerateMetricBatch(metricsPerBatch, 1, true)
-		if batch == nil {
-			return nil
-		}
-		batches = append(batches, batch)
-	}
-	return batches
+func generateMetricInt64Batches(gen *otlp.Generator) otlp.ExportRequest {
+	return gen.GenerateMetricBatch(metricsPerBatch, 1, true)
 }
 
 func encode(request otlp.ExportRequest) []byte {
