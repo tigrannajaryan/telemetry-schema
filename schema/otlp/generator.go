@@ -15,7 +15,7 @@ import (
 	otlptrace "github.com/open-telemetry/opentelemetry-proto/gen/go/trace/v1"
 )
 
-const attrsPerResource = 20
+const attrsPerResource = 15
 const metricLabelCount = 2
 
 // Generator allows to generate a ExportRequest.

@@ -10,48 +10,68 @@ type AttributesRenameAction map[string]string
 
 func (at AttributesRenameAction) Apply(attrs []*otlpcommon.KeyValue, changes *ApplyResult) {
 	var err error
-	newAttrs := newFastMap(len(attrs))
-	converted := false
 
-	for _, attr := range attrs {
-		k := attr.Key
-		if convertTo, exists := at[k]; exists {
-			k = convertTo
-			converted = true
+	seenAttrs := newFastMap(len(attrs))
+	var changeLog keyRenameLog
+
+	for i, attr := range attrs {
+		if seenAttrs.exists(attr.Key) {
+			err = fmt.Errorf("attribute %s conflicts", attr.Key)
+			break
 		}
-		if newAttrs.exists(k) {
-			err = fmt.Errorf("label %s conflicts", k)
-			changes.AppendError(err)
+
+		seenAttrs.set(attr.Key, attr.Value)
+
+		if convertTo, exists := at[attr.Key]; exists {
+			if seenAttrs.exists(convertTo) {
+				err = fmt.Errorf("attribute %s conflicts", attr.Key)
+				break
+			}
+			seenAttrs.set(convertTo, attr.Value)
+
+			if changeLog.savedAttrs == nil {
+				changeLog.savedAttrs = changeLog.fixedBuf[:]
+				changeLog.savedAttrs = changeLog.savedAttrs[:0]
+				changeLog.origAttrs = attrs
+			} else if len(changeLog.savedAttrs) == len(changeLog.fixedBuf) {
+				changeLog.savedAttrs = make([]savedAttrKey, len(changeLog.savedAttrs), len(changeLog.savedAttrs)+1)
+				copy(changeLog.savedAttrs, changeLog.fixedBuf[:])
+			}
+
+			changeLog.savedAttrs = append(
+				changeLog.savedAttrs, savedAttrKey{
+					at:  i,
+					key: attr.Key,
+				},
+			)
+
+			attr.Key = convertTo
 		}
-		newAttrs.set(k, attr.Value)
 	}
-	if converted && err == nil {
-		preserve := make([]otlpcommon.KeyValue, len(attrs))
-		for i := 0; i < len(attrs); i++ {
-			preserve[i] = *attrs[i]
-		}
 
-		changes.Append(
-			rollbacker{attrs, preserve},
-			//func() {
-			//	for i := 0; i < len(preserve); i++ {
-			//		*attrs[i] = preserve[i]
-			//	}
-			//},
-		)
+	if err != nil {
+		changes.AppendError(err)
+	}
 
-		newAttrs.copyTo(attrs)
+	if len(changeLog.savedAttrs) > 0 {
+		changes.Append(&changeLog)
 	}
 }
 
-type rollbacker struct {
-	attrs    []*otlpcommon.KeyValue
-	preserve []otlpcommon.KeyValue
+type savedAttrKey struct {
+	at  int
+	key string
 }
 
-func (r rollbacker) Rollback() {
-	for i := 0; i < len(r.preserve); i++ {
-		*r.attrs[i] = r.preserve[i]
+type keyRenameLog struct {
+	origAttrs  []*otlpcommon.KeyValue
+	fixedBuf   [8]savedAttrKey
+	savedAttrs []savedAttrKey
+}
+
+func (r *keyRenameLog) Rollback() {
+	for i := 0; i < len(r.savedAttrs); i++ {
+		r.origAttrs[r.savedAttrs[i].at].Key = r.savedAttrs[i].key
 	}
 }
 

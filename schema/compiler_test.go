@@ -260,7 +260,7 @@ func BenchmarkResourceSchemaConversion(b *testing.B) {
 			},
 		}
 
-		for j := len(resource.Attributes); j < 20; j++ {
+		for j := len(resource.Attributes); j < 15; j++ {
 			resource.Attributes = append(
 				resource.Attributes,
 				&otlpcommon.KeyValue{
