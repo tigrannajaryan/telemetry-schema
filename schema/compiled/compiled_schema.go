@@ -57,7 +57,8 @@ type ResourceAction interface {
 }
 
 type ChangeLog struct {
-	log []Change
+	Enabled bool
+	log     []Change
 }
 
 type Change interface {

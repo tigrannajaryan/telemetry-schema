@@ -242,6 +242,7 @@ func TestMetricsSchemaConversion(t *testing.T) {
 */
 
 func BenchmarkResourceSchemaConversion(b *testing.B) {
+	b.SkipNow()
 	schema := compileTestSchema(b)
 
 	var resources []*otlpresource.Resource

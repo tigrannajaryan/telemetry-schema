@@ -26,7 +26,7 @@ var batchTypes = []struct {
 	batchGen func(gen *otlp.Generator) otlp.ExportRequest
 }{
 	//{name: "Logs", batchGen: generateLogBatches},
-	{name: "Trace/Attribs", batchGen: generateAttrBatches},
+	{name: "Spans", batchGen: generateAttrBatches},
 	//{name: "Trace/Events", batchGen: generateTimedEventBatches},
 	//{name: "Metric/Int64", batchGen: generateMetricInt64Batches},
 }
@@ -45,28 +45,6 @@ func BenchmarkGenerate(b *testing.B) {
 						b.SkipNow()
 						return
 					}
-				}
-			},
-		)
-	}
-}
-
-func BenchmarkEncode(b *testing.B) {
-
-	for _, batchType := range batchTypes {
-		b.Run(
-			batchType.name, func(b *testing.B) {
-				gen := otlp.NewGenerator()
-				batch := batchType.batchGen(gen)
-				if batch == nil {
-					// Unsupported test type and batch type combination.
-					b.SkipNow()
-					return
-				}
-
-				b.ResetTimer()
-				for i := 0; i < b.N; i++ {
-					encode(batch)
 				}
 			},
 		)
@@ -95,6 +73,28 @@ func BenchmarkDecode(b *testing.B) {
 	}
 }
 
+func BenchmarkEncode(b *testing.B) {
+
+	for _, batchType := range batchTypes {
+		b.Run(
+			batchType.name, func(b *testing.B) {
+				gen := otlp.NewGenerator()
+				batch := batchType.batchGen(gen)
+				if batch == nil {
+					// Unsupported test type and batch type combination.
+					b.SkipNow()
+					return
+				}
+
+				b.ResetTimer()
+				for i := 0; i < b.N; i++ {
+					encode(batch)
+				}
+			},
+		)
+	}
+}
+
 func BenchmarkConvertSchema(b *testing.B) {
 	ast, err := Parse("testdata/schema-example.yaml")
 	require.NoError(b, err)
@@ -102,26 +102,33 @@ func BenchmarkConvertSchema(b *testing.B) {
 	schema := Compile(ast)
 
 	for _, batchType := range batchTypes {
-		b.Run(
-			batchType.name, func(b *testing.B) {
-				var msgs []proto.Message
-				for i := 0; i < b.N; i++ {
-					msg := batchType.batchGen(otlp.NewGenerator())
-					if msg == nil {
-						// Unsupported test type and batch type combination.
-						b.SkipNow()
-						return
+		withChangeLogs := []bool{false, true}
+		for _, withChangeLog := range withChangeLogs {
+			label := "Non-rollbackable"
+			if withChangeLog {
+				label = "Rollbackable"
+			}
+			b.Run(
+				batchType.name+"/"+label, func(b *testing.B) {
+					var msgs []proto.Message
+					for i := 0; i < b.N; i++ {
+						msg := batchType.batchGen(otlp.NewGenerator())
+						if msg == nil {
+							// Unsupported test type and batch type combination.
+							b.SkipNow()
+							return
+						}
+						msgs = append(msgs, msg)
 					}
-					msgs = append(msgs, msg)
-				}
 
-				b.ResetTimer()
-				for i := 0; i < b.N; i++ {
-					changes := compiled.ChangeLog{}
-					converter.ConvertRequest(msgs[i].(otlp.ExportRequest), schema, &changes)
-				}
-			},
-		)
+					b.ResetTimer()
+					for i := 0; i < b.N; i++ {
+						changes := compiled.ChangeLog{Enabled: withChangeLog}
+						converter.ConvertRequest(msgs[i].(otlp.ExportRequest), schema, &changes)
+					}
+				},
+			)
+		}
 	}
 }
 
@@ -160,6 +167,7 @@ func decode(bytes []byte, pb proto.Message) {
 }
 
 func BenchmarkMap(b *testing.B) {
+	b.SkipNow()
 	for i := 0; i < b.N; i++ {
 		for j := 0; j < 100; j++ {
 			m := map[string]string{}

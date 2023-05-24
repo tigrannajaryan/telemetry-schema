@@ -29,7 +29,7 @@ func (at AttributesRenameAction) Apply(attrs []*otlpcommon.KeyValue, changes *Ch
 			}
 			seenAttrs.set(convertTo, attr.Value)
 
-			if changeLog.savedAttrs == nil {
+			if changes.Enabled && changeLog.savedAttrs == nil {
 				changeLog.origAttrs = attrs
 				changeLog.savedAttrs = make([]otlpcommon.KeyValue, len(attrs))
 				for j, attr := range attrs {
