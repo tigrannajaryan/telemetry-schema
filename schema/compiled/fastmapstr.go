@@ -1,9 +1,5 @@
 package compiled
 
-import (
-	otlpcommon "github.com/open-telemetry/opentelemetry-proto/gen/go/common/v1"
-)
-
 type keyValStr struct {
 	key string
 	val string
@@ -61,18 +57,18 @@ func (m *fastMapStr) exists(k string) bool {
 	}
 }
 
-func (m *fastMapStr) copyTo(attrs []*otlpcommon.StringKeyValue) {
-	if m.mp == nil {
-		for i := 0; i < m.sliceLen; i++ {
-			attrs[i].Key = m.slice[i].key
-			attrs[i].Value = m.slice[i].val
-		}
-	} else {
-		i := 0
-		for k, v := range m.mp {
-			attrs[i].Key = k
-			attrs[i].Value = v
-			i++
-		}
-	}
-}
+//func (m *fastMapStr) copyTo(attrs []*otlpcommon.StringKeyValue) {
+//	if m.mp == nil {
+//		for i := 0; i < m.sliceLen; i++ {
+//			attrs[i].Key = m.slice[i].key
+//			attrs[i].Value = m.slice[i].val
+//		}
+//	} else {
+//		i := 0
+//		for k, v := range m.mp {
+//			attrs[i].Key = k
+//			attrs[i].Value = v
+//			i++
+//		}
+//	}
+//}

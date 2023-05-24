@@ -1,7 +1,7 @@
 package compiled
 
 import (
-	otlpcommon "github.com/open-telemetry/opentelemetry-proto/gen/go/common/v1"
+	otlpcommon "go.opentelemetry.io/proto/otlp/common/v1"
 )
 
 type keyVal struct {

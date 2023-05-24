@@ -1,7 +1,7 @@
 package compiled
 
 import (
-	otlptrace "github.com/open-telemetry/opentelemetry-proto/gen/go/trace/v1"
+	otlptrace "go.opentelemetry.io/proto/otlp/trace/v1"
 
 	"github.com/tigrannajaryan/telemetry-schema/schema/types"
 )

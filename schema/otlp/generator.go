@@ -2,17 +2,14 @@ package otlp
 
 import (
 	"math/rand"
-	"strconv"
 	"sync/atomic"
 	"time"
 
 	"github.com/golang/protobuf/proto"
-	otlpmetriccol "github.com/open-telemetry/opentelemetry-proto/gen/go/collector/metrics/v1"
-	otlptracecol "github.com/open-telemetry/opentelemetry-proto/gen/go/collector/trace/v1"
-	otlpcommon "github.com/open-telemetry/opentelemetry-proto/gen/go/common/v1"
-	otlpmetric "github.com/open-telemetry/opentelemetry-proto/gen/go/metrics/v1"
-	otlpresource "github.com/open-telemetry/opentelemetry-proto/gen/go/resource/v1"
-	otlptrace "github.com/open-telemetry/opentelemetry-proto/gen/go/trace/v1"
+	otlptracecol "go.opentelemetry.io/proto/otlp/collector/trace/v1"
+	otlpcommon "go.opentelemetry.io/proto/otlp/common/v1"
+	otlpresource "go.opentelemetry.io/proto/otlp/resource/v1"
+	otlptrace "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
 const attrsPerResource = 15
@@ -97,14 +94,14 @@ func (g *Generator) GenerateSpanBatch(
 ) *otlptracecol.ExportTraceServiceRequest {
 	traceID := atomic.AddUint64(&g.tracesSent, 1)
 
-	il := &otlptrace.InstrumentationLibrarySpans{
-		InstrumentationLibrary: &otlpcommon.InstrumentationLibrary{Name: "io.opentelemetry"},
+	il := &otlptrace.ScopeSpans{
+		Scope: &otlpcommon.InstrumentationScope{Name: "io.opentelemetry"},
 	}
 	batch := &otlptracecol.ExportTraceServiceRequest{
 		ResourceSpans: []*otlptrace.ResourceSpans{
 			{
-				Resource:                    g.GenResource(),
-				InstrumentationLibrarySpans: []*otlptrace.InstrumentationLibrarySpans{il},
+				Resource:   g.GenResource(),
+				ScopeSpans: []*otlptrace.ScopeSpans{il},
 			},
 		},
 	}
@@ -119,7 +116,7 @@ func (g *Generator) GenerateSpanBatch(
 			TraceId:           GenerateTraceID(traceID),
 			SpanId:            GenerateSpanID(spanID),
 			Name:              "load-generator-span",
-			Kind:              otlptrace.Span_CLIENT,
+			Kind:              otlptrace.Span_SPAN_KIND_CLIENT,
 			StartTimeUnixNano: TimeToTimestamp(startTime),
 			EndTimeUnixNano:   TimeToTimestamp(startTime.Add(time.Duration(i) * time.Millisecond)),
 		}
@@ -244,6 +241,7 @@ func (g *Generator) GenerateLogBatch(logsPerBatch int, attrsPerLog int) ExportRe
 	return nil
 }
 
+/*
 func (g *Generator) genInt64Timeseries(
 	startTime time.Time, offset int, valuesPerTimeseries int,
 ) []*otlpmetric.Int64DataPoint {
@@ -354,6 +352,7 @@ func (g *Generator) GenerateMetricBatch(
 	}
 	return batch
 }
+*/
 
 type SpanTranslator struct {
 }

@@ -3,7 +3,7 @@ package compiled
 import (
 	"fmt"
 
-	otlpcommon "github.com/open-telemetry/opentelemetry-proto/gen/go/common/v1"
+	otlpcommon "go.opentelemetry.io/proto/otlp/common/v1"
 )
 
 type AttributesRenameAction map[string]string

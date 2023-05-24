@@ -3,9 +3,9 @@ package compiled
 import (
 	"sort"
 
-	otlpmetric "github.com/open-telemetry/opentelemetry-proto/gen/go/metrics/v1"
-	otlpresource "github.com/open-telemetry/opentelemetry-proto/gen/go/resource/v1"
-	otlptrace "github.com/open-telemetry/opentelemetry-proto/gen/go/trace/v1"
+	otlpmetric "go.opentelemetry.io/proto/otlp/metrics/v1"
+	otlpresource "go.opentelemetry.io/proto/otlp/resource/v1"
+	otlptrace "go.opentelemetry.io/proto/otlp/trace/v1"
 
 	"github.com/tigrannajaryan/telemetry-schema/schema/types"
 )

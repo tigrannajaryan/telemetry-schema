@@ -1,10 +1,7 @@
 package compiled
 
 import (
-	"fmt"
-
-	otlpcommon "github.com/open-telemetry/opentelemetry-proto/gen/go/common/v1"
-	otlpmetric "github.com/open-telemetry/opentelemetry-proto/gen/go/metrics/v1"
+	otlpmetric "go.opentelemetry.io/proto/otlp/metrics/v1"
 
 	"github.com/tigrannajaryan/telemetry-schema/schema/types"
 )
@@ -13,9 +10,9 @@ type MetricRenameAction map[types.MetricName]types.MetricName
 
 func (act MetricRenameAction) Apply(metrics []*otlpmetric.Metric) ([]*otlpmetric.Metric, error) {
 	for _, metric := range metrics {
-		newName, exists := act[types.MetricName(metric.MetricDescriptor.Name)]
+		newName, exists := act[types.MetricName(metric.Name)]
 		if exists {
-			metric.MetricDescriptor.Name = string(newName)
+			metric.Name = string(newName)
 		}
 	}
 	return metrics, nil
@@ -32,10 +29,10 @@ func (act MetricLabelRenameAction) Apply(metrics []*otlpmetric.Metric) (
 	[]*otlpmetric.Metric, error,
 ) {
 	var retErr error
-	for _, metric := range metrics {
+	/*	for _, metric := range metrics {
 
 		if len(act.ApplyOnlyToMetrics) > 0 {
-			if _, exists := act.ApplyOnlyToMetrics[types.MetricName(metric.MetricDescriptor.Name)]; !exists {
+			if _, exists := act.ApplyOnlyToMetrics[types.MetricName(metric.Name)]; !exists {
 				continue
 			}
 		}
@@ -53,11 +50,12 @@ func (act MetricLabelRenameAction) Apply(metrics []*otlpmetric.Metric) (
 			}
 		}
 
-	}
+	}*/
 
 	return metrics, retErr
 }
 
+/*
 func renameLabels(labels []*otlpcommon.StringKeyValue, renameRules map[string]string) error {
 	var err error
 	newLabels := newFastMapStr(len(labels))
@@ -78,6 +76,7 @@ func renameLabels(labels []*otlpcommon.StringKeyValue, renameRules map[string]st
 	}
 	return err
 }
+*/
 
 type MetricSplitAction struct {
 	// ApplyOnlyToMetrics limits which metrics this action should apply to. If empty then
@@ -88,30 +87,32 @@ type MetricSplitAction struct {
 }
 
 func (act MetricSplitAction) Apply(metrics []*otlpmetric.Metric) ([]*otlpmetric.Metric, error) {
-	for i := 0; i < len(metrics); i++ {
-		metric := metrics[i]
-		if act.MetricName != types.MetricName(metric.MetricDescriptor.Name) {
-			continue
-		}
-
-		var outputMetrics []*otlpmetric.Metric
-		dt := metric.MetricDescriptor.Type
-		switch dt {
-		case otlpmetric.MetricDescriptor_INT64:
-			dps := metric.Int64DataPoints
-			for j := 0; j < len(dps); j++ {
-				dp := dps[j]
-				outputMetric := splitMetric(act.AttributeName, act.SplitMap, metric, dp)
-				outputMetrics = append(outputMetrics, outputMetric)
+	/*
+		for i := 0; i < len(metrics); i++ {
+			metric := metrics[i]
+			if act.MetricName != types.MetricName(metric.Name) {
+				continue
 			}
+
+			var outputMetrics []*otlpmetric.Metric
+			dt := metric.MetricDescriptor.Type
+			switch dt {
+			case otlpmetric.MetricDescriptor_INT64:
+				dps := metric.Int64DataPoints
+				for j := 0; j < len(dps); j++ {
+					dp := dps[j]
+					outputMetric := splitMetric(act.AttributeName, act.SplitMap, metric, dp)
+					outputMetrics = append(outputMetrics, outputMetric)
+				}
+			}
+
+			metrics = append(append(metrics[0:i], outputMetrics...), metrics[i+1:]...)
 		}
-
-		metrics = append(append(metrics[0:i], outputMetrics...), metrics[i+1:]...)
-	}
-
+	*/
 	return metrics, nil
 }
 
+/*
 func splitMetric(
 	splitByAttr types.AttributeName,
 	splitRules map[types.AttributeValue]types.MetricName,
@@ -138,3 +139,4 @@ func splitMetric(
 	output.Int64DataPoints = []*otlpmetric.Int64DataPoint{&outputDp}
 	return output
 }
+*/

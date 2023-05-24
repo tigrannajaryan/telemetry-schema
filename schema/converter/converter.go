@@ -1,9 +1,9 @@
 package converter
 
 import (
-	otlpmetriccol "github.com/open-telemetry/opentelemetry-proto/gen/go/collector/metrics/v1"
-	otlptracecol "github.com/open-telemetry/opentelemetry-proto/gen/go/collector/trace/v1"
-	otlpresource "github.com/open-telemetry/opentelemetry-proto/gen/go/resource/v1"
+	otlpmetriccol "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
+	otlptracecol "go.opentelemetry.io/proto/otlp/collector/trace/v1"
+	otlpresource "go.opentelemetry.io/proto/otlp/resource/v1"
 
 	"github.com/tigrannajaryan/telemetry-schema/schema/compiled"
 	"github.com/tigrannajaryan/telemetry-schema/schema/otlp"
@@ -21,7 +21,7 @@ func convertTraceRequest(
 			return err
 		}
 
-		for _, ils := range rss.InstrumentationLibrarySpans {
+		for _, ils := range rss.ScopeSpans {
 			if err := schema.ConvertSpansToLatest("0.0.0", ils.Spans, changes); err != nil {
 				return err
 			}
@@ -35,7 +35,7 @@ func convertMetricRequest(
 ) error {
 	for _, rss := range request.ResourceMetrics {
 		convertResource(rss.Resource, schema, changes)
-		for _, ils := range rss.InstrumentationLibraryMetrics {
+		for _, ils := range rss.ScopeMetrics {
 			if err := schema.ConvertMetricsToLatest("0.0.0", &ils.Metrics); err != nil {
 				return err
 			}

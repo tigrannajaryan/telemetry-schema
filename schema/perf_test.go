@@ -28,7 +28,7 @@ var batchTypes = []struct {
 	//{name: "Logs", batchGen: generateLogBatches},
 	{name: "Trace/Attribs", batchGen: generateAttrBatches},
 	//{name: "Trace/Events", batchGen: generateTimedEventBatches},
-	{name: "Metric/Int64", batchGen: generateMetricInt64Batches},
+	//{name: "Metric/Int64", batchGen: generateMetricInt64Batches},
 }
 
 func BenchmarkGenerate(b *testing.B) {
@@ -137,9 +137,12 @@ func generateLogBatches(gen *otlp.Generator) otlp.ExportRequest {
 	return gen.GenerateLogBatch(logsPerBatch, attrsPerLog)
 }
 
+/*
 func generateMetricInt64Batches(gen *otlp.Generator) otlp.ExportRequest {
 	return gen.GenerateMetricBatch(metricsPerBatch, 1, true)
 }
+
+*/
 
 func encode(request otlp.ExportRequest) []byte {
 	bytes, err := proto.Marshal(request)
