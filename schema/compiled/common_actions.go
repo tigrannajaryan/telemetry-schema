@@ -12,9 +12,9 @@ func (at AttributesRenameAction) Apply(attrs []*otlpcommon.KeyValue, changes *Ch
 	var err error
 
 	seenAttrs := newFastMap(len(attrs))
-	var changeLog keyRenameLog
+	var changeLog attrsModifyLog
 
-	for i, attr := range attrs {
+	for _, attr := range attrs {
 		if seenAttrs.exists(attr.Key) {
 			err = fmt.Errorf("attribute %s conflicts", attr.Key)
 			break
@@ -30,20 +30,12 @@ func (at AttributesRenameAction) Apply(attrs []*otlpcommon.KeyValue, changes *Ch
 			seenAttrs.set(convertTo, attr.Value)
 
 			if changeLog.savedAttrs == nil {
-				changeLog.savedAttrs = changeLog.fixedBuf[:]
-				changeLog.savedAttrs = changeLog.savedAttrs[:0]
 				changeLog.origAttrs = attrs
-			} else if len(changeLog.savedAttrs) == len(changeLog.fixedBuf) {
-				changeLog.savedAttrs = make([]savedAttrKey, len(changeLog.savedAttrs), len(changeLog.savedAttrs)+1)
-				copy(changeLog.savedAttrs, changeLog.fixedBuf[:])
+				changeLog.savedAttrs = make([]otlpcommon.KeyValue, len(attrs))
+				for j, attr := range attrs {
+					changeLog.savedAttrs[j] = *attr
+				}
 			}
-
-			changeLog.savedAttrs = append(
-				changeLog.savedAttrs, savedAttrKey{
-					at:  i,
-					key: attr.Key,
-				},
-			)
 
 			attr.Key = convertTo
 		}
@@ -56,20 +48,14 @@ func (at AttributesRenameAction) Apply(attrs []*otlpcommon.KeyValue, changes *Ch
 	return err
 }
 
-type savedAttrKey struct {
-	at  int
-	key string
-}
-
-type keyRenameLog struct {
+type attrsModifyLog struct {
 	origAttrs  []*otlpcommon.KeyValue
-	fixedBuf   [8]savedAttrKey
-	savedAttrs []savedAttrKey
+	savedAttrs []otlpcommon.KeyValue
 }
 
-func (r *keyRenameLog) Rollback() {
+func (r *attrsModifyLog) Rollback() {
 	for i := 0; i < len(r.savedAttrs); i++ {
-		r.origAttrs[r.savedAttrs[i].at].Key = r.savedAttrs[i].key
+		*r.origAttrs[i] = r.savedAttrs[i]
 	}
 }
 
