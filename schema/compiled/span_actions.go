@@ -24,12 +24,12 @@ type SpanAttributeRenameAction struct {
 	ApplyOnlyToSpans map[types.SpanName]bool
 }
 
-func (act SpanAttributeRenameAction) Apply(span *otlptrace.Span, changes *ApplyResult) {
+func (act SpanAttributeRenameAction) Apply(span *otlptrace.Span, changes *ChangeLog) error {
 	if len(act.ApplyOnlyToSpans) > 0 {
 		if _, exists := act.ApplyOnlyToSpans[types.SpanName(span.Name)]; !exists {
-			return
+			return nil
 		}
 	}
 
-	act.AttributesRenameAction.Apply(span.Attributes, changes)
+	return act.AttributesRenameAction.Apply(span.Attributes, changes)
 }

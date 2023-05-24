@@ -8,7 +8,7 @@ import (
 
 type AttributesRenameAction map[string]string
 
-func (at AttributesRenameAction) Apply(attrs []*otlpcommon.KeyValue, changes *ApplyResult) {
+func (at AttributesRenameAction) Apply(attrs []*otlpcommon.KeyValue, changes *ChangeLog) error {
 	var err error
 
 	seenAttrs := newFastMap(len(attrs))
@@ -49,13 +49,11 @@ func (at AttributesRenameAction) Apply(attrs []*otlpcommon.KeyValue, changes *Ap
 		}
 	}
 
-	if err != nil {
-		changes.AppendError(err)
-	}
-
 	if len(changeLog.savedAttrs) > 0 {
 		changes.Append(&changeLog)
 	}
+
+	return err
 }
 
 type savedAttrKey struct {

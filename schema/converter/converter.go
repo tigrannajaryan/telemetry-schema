@@ -9,47 +9,47 @@ import (
 	"github.com/tigrannajaryan/telemetry-schema/schema/otlp"
 )
 
-func convertResource(resource *otlpresource.Resource, schema *compiled.Schema, changes *compiled.ApplyResult) {
-	schema.ConvertResourceToLatest("0.0.0", resource, changes)
+func convertResource(resource *otlpresource.Resource, schema *compiled.Schema, changes *compiled.ChangeLog) error {
+	return schema.ConvertResourceToLatest("0.0.0", resource, changes)
 }
 
 func convertTraceRequest(
-	request *otlptracecol.ExportTraceServiceRequest, schema *compiled.Schema, changes *compiled.ApplyResult,
-) {
+	request *otlptracecol.ExportTraceServiceRequest, schema *compiled.Schema, changes *compiled.ChangeLog,
+) error {
 	for _, rss := range request.ResourceSpans {
-		convertResource(rss.Resource, schema, changes)
-		if changes.IsError() {
-			return
+		if err := convertResource(rss.Resource, schema, changes); err != nil {
+			return err
 		}
 
 		for _, ils := range rss.InstrumentationLibrarySpans {
-			schema.ConvertSpansToLatest("0.0.0", ils.Spans, changes)
-			if changes.IsError() {
-				return
+			if err := schema.ConvertSpansToLatest("0.0.0", ils.Spans, changes); err != nil {
+				return err
 			}
 		}
 	}
-	return
+	return nil
 }
 
 func convertMetricRequest(
-	request *otlpmetriccol.ExportMetricsServiceRequest, schema *compiled.Schema, changes *compiled.ApplyResult,
-) {
+	request *otlpmetriccol.ExportMetricsServiceRequest, schema *compiled.Schema, changes *compiled.ChangeLog,
+) error {
 	for _, rss := range request.ResourceMetrics {
 		convertResource(rss.Resource, schema, changes)
 		for _, ils := range rss.InstrumentationLibraryMetrics {
 			if err := schema.ConvertMetricsToLatest("0.0.0", &ils.Metrics); err != nil {
-				// logger.Debug("Conversion error", zap.Error(err))
+				return err
 			}
 		}
 	}
+	return nil
 }
 
-func ConvertRequest(request otlp.ExportRequest, schema *compiled.Schema, changes *compiled.ApplyResult) {
+func ConvertRequest(request otlp.ExportRequest, schema *compiled.Schema, changes *compiled.ChangeLog) error {
 	switch r := request.(type) {
 	case *otlptracecol.ExportTraceServiceRequest:
-		convertTraceRequest(r, schema, changes)
+		return convertTraceRequest(r, schema, changes)
 	case *otlpmetriccol.ExportMetricsServiceRequest:
-		convertMetricRequest(r, schema, changes)
+		return convertMetricRequest(r, schema, changes)
 	}
+	return nil
 }

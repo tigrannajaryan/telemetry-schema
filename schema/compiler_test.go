@@ -64,9 +64,9 @@ func TestResourceSchemaConversion(t *testing.T) {
 		},
 	}
 	resource2 := proto.Clone(resource).(*otlpresource.Resource)
-	changes := compiled.ApplyResult{}
-	schema.ConvertResourceToLatest("0.0.0", resource2, &changes)
-	assert.False(t, changes.IsError())
+	changes := compiled.ChangeLog{}
+	err := schema.ConvertResourceToLatest("0.0.0", resource2, &changes)
+	assert.NoError(t, err)
 
 	assert.EqualValues(t, 3, len(resource2.Attributes))
 
@@ -128,9 +128,9 @@ func TestResourceSchemaConversionConflict(t *testing.T) {
 
 	requestCopy := proto.Clone(request)
 
-	changes := &compiled.ApplyResult{}
-	converter.ConvertRequest(request, schema, changes)
-	assert.True(t, changes.IsError())
+	changes := &compiled.ChangeLog{}
+	err := converter.ConvertRequest(request, schema, changes)
+	assert.Error(t, err)
 	assert.False(t, proto.Equal(request, requestCopy))
 
 	changes.Rollback()
@@ -275,8 +275,8 @@ func BenchmarkResourceSchemaConversion(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		changes := compiled.ApplyResult{}
-		schema.ConvertResourceToLatest("0.0.0", resources[i], &changes)
-		assert.False(b, changes.IsError())
+		changes := compiled.ChangeLog{}
+		err := schema.ConvertResourceToLatest("0.0.0", resources[i], &changes)
+		assert.NoError(b, err)
 	}
 }

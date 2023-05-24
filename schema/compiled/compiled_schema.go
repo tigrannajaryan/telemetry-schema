@@ -28,13 +28,13 @@ type ActionsForVersion struct {
 
 type ResourceActions []ResourceAction
 
-func (acts ResourceActions) Apply(resource *otlpresource.Resource, changes *ApplyResult) {
+func (acts ResourceActions) Apply(resource *otlpresource.Resource, changes *ChangeLog) error {
 	for _, a := range acts {
-		a.Apply(resource, changes)
-		if changes.IsError() {
-			break
+		if err := a.Apply(resource, changes); err != nil {
+			return err
 		}
 	}
+	return nil
 }
 
 type MetricActions struct {
@@ -53,58 +53,46 @@ func (acts MetricActions) Apply(metrics []*otlpmetric.Metric) ([]*otlpmetric.Met
 }
 
 type ResourceAction interface {
-	Apply(resource *otlpresource.Resource, changes *ApplyResult)
+	Apply(resource *otlpresource.Resource, changes *ChangeLog) error
 }
 
-type ApplyResult struct {
-	errs     []error
-	rollback []Rollbacker
+type ChangeLog struct {
+	log []Change
 }
 
-type Rollbacker interface {
+type Change interface {
 	Rollback()
 }
 
-func (ar *ApplyResult) IsError() bool {
-	return len(ar.errs) > 0
+func (ar *ChangeLog) Merge(other ChangeLog) {
+	ar.log = append(ar.log, other.log...)
 }
 
-func (ar *ApplyResult) Merge(next ApplyResult) {
-	ar.rollback = append(ar.rollback, next.rollback...)
-	ar.errs = append(ar.errs, next.errs...)
-}
-
-func (ar *ApplyResult) Rollback() {
-	for i := len(ar.rollback) - 1; i >= 0; i-- {
-		ar.rollback[i].Rollback()
+func (ar *ChangeLog) Rollback() {
+	for i := len(ar.log) - 1; i >= 0; i-- {
+		ar.log[i].Rollback()
 	}
 }
 
-func (ar *ApplyResult) Append(f Rollbacker) {
-	ar.rollback = append(ar.rollback, f)
-}
-
-func (ar *ApplyResult) AppendError(err error) {
-	if err != nil {
-		ar.errs = append(ar.errs, err)
-	}
+func (ar *ChangeLog) Append(f Change) {
+	ar.log = append(ar.log, f)
 }
 
 type SpanAction interface {
-	Apply(trace *otlptrace.Span, changes *ApplyResult)
+	Apply(trace *otlptrace.Span, changes *ChangeLog) error
 }
 
 type SpanActions struct {
 	ForAllSpans []SpanAction
 }
 
-func (acts SpanActions) Apply(span *otlptrace.Span, changes *ApplyResult) {
+func (acts SpanActions) Apply(span *otlptrace.Span, changes *ChangeLog) error {
 	for _, a := range acts.ForAllSpans {
-		a.Apply(span, changes)
-		if changes.IsError() {
-			break
+		if err := a.Apply(span, changes); err != nil {
+			return err
 		}
 	}
+	return nil
 }
 
 type MetricAction interface {
@@ -128,8 +116,8 @@ func (afv ActionsForVersions) Swap(i, j int) {
 }
 
 func (s *Schema) ConvertResourceToLatest(
-	fromVersion types.TelemetryVersion, resource *otlpresource.Resource, changes *ApplyResult,
-) {
+	fromVersion types.TelemetryVersion, resource *otlpresource.Resource, changes *ChangeLog,
+) error {
 	startIndex := sort.Search(
 		len(s.Versions), func(i int) bool {
 			// TODO: use proper semver comparison.
@@ -138,22 +126,21 @@ func (s *Schema) ConvertResourceToLatest(
 	)
 	if startIndex > len(s.Versions) {
 		// Nothing to do
-		return
+		return nil
 	}
 
 	for i := startIndex; i < len(s.Versions); i++ {
-		s.Versions[i].Resource.Apply(resource, changes)
-		if changes.IsError() {
-			break
+		if err := s.Versions[i].Resource.Apply(resource, changes); err != nil {
+			return err
 		}
 	}
 
-	return
+	return nil
 }
 
 func (s *Schema) ConvertSpansToLatest(
-	fromVersion types.TelemetryVersion, spans []*otlptrace.Span, changes *ApplyResult,
-) {
+	fromVersion types.TelemetryVersion, spans []*otlptrace.Span, changes *ChangeLog,
+) error {
 	startIndex := sort.Search(
 		len(s.Versions), func(i int) bool {
 			// TODO: use proper semver comparison.
@@ -162,18 +149,18 @@ func (s *Schema) ConvertSpansToLatest(
 	)
 	if startIndex > len(s.Versions) {
 		// Nothing to do
-		return
+		return nil
 	}
 
 	for i := startIndex; i < len(s.Versions); i++ {
 		for j := 0; j < len(spans); j++ {
 			span := spans[j]
-			s.Versions[i].Spans.Apply(span, changes)
-			if changes.IsError() {
-				return
+			if err := s.Versions[i].Spans.Apply(span, changes); err != nil {
+				return err
 			}
 		}
 	}
+	return nil
 }
 
 func (s *Schema) ConvertMetricsToLatest(

@@ -117,7 +117,7 @@ func BenchmarkConvertSchema(b *testing.B) {
 
 				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
-					changes := compiled.ApplyResult{}
+					changes := compiled.ChangeLog{}
 					converter.ConvertRequest(msgs[i].(otlp.ExportRequest), schema, &changes)
 				}
 			},
